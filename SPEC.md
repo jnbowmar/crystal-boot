@@ -108,7 +108,7 @@ Cloudflare Worker (API)
 | M2 | Worker + D1 + cron settlement, no auth (fake users) | matches from 9/20 settle and score correctly |
 | M3 | React pick flow at 375px + Pi auth in the Pi Browser sandbox | James makes real picks for next weekend's EPL |
 | M4 | Private leagues + testnet Pi payment for creating one | full approve→sign→complete loop, cancel handled |
-| M5 | #PiHackathon entry: video, README, public repo (PiOS or MIT) | submitted by the last day of the month |
+| M5 | #PiHackathon entry: video, README, public repo (MIT, decided 2026-09-23) | submitted by the last day of the month |
 
 ## M0 results (2026-09-23)
 
