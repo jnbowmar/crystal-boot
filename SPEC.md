@@ -79,6 +79,8 @@ https://raw.githubusercontent.com/openfootball/football.json/master/2026-27/en.1
 | Season stats pack | 3 Pi | Calibration chart ("when you say 80%, you're right 71%"), best/worst teams to call, streaks |
 | Profile badge / flair | 1 Pi | Status on leaderboards |
 
+**Price against mining, not dollars (2026-09-23).** Base mining is ~0.0023 Pi/hr = ~0.055 Pi/day = ~20 Pi/yr, so 5 Pi is ~90 days of a typical pioneer's mining. Re-price before M4 in the range of 0.5 Pi (league) / 0.3 Pi (stats pack) / 0.1 Pi (badge), and check current mining rates when M4 starts. Earned Pi is held, per James's long-horizon thesis; FMV at receipt is LLC ordinary income.
+
 Same flow as the Unlock Calendar: `Pi.createPayment` → Worker `/approve` → user signs → Worker `/complete` → unlock only after a 200. `onIncompletePaymentFound` resumes on next load. Testnet sandbox first.
 
 ## Architecture
