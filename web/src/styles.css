@@ -98,7 +98,7 @@ h3 {
   width: 100%;
   max-width: 480px;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   background: var(--panel);
   border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
@@ -607,6 +607,109 @@ button.card:active {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Leagues */
+.panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.panel h2 {
+  font-size: 18px;
+}
+
+.panel .note,
+.panel .error,
+.panel .fine {
+  margin: 0;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.field input {
+  font: inherit;
+  font-size: 17px;
+  color: var(--ink);
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  min-height: 48px;
+}
+
+.field input.code-input {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.field input:disabled {
+  opacity: 0.5;
+}
+
+.small {
+  font-size: 14px;
+  margin: 0;
+}
+
+.card.league .league-name {
+  display: block;
+  font-weight: 700;
+  font-size: 17px;
+}
+
+.back {
+  margin: 0 0 8px -4px;
+  text-decoration: none;
+}
+
+.league-title {
+  font-size: 22px;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+
+.invite {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.invite div {
+  display: grid;
+}
+
+.code {
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ice);
+}
+
+.secondary.slim {
+  width: auto;
+  min-height: 44px;
+  padding: 0 18px;
+  font-size: 15px;
+}
+
+.leave {
+  display: block;
+  margin: 16px auto 0;
 }
 
 /* Messages */

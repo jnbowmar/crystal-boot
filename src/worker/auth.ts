@@ -4,18 +4,11 @@
 // token, so later requests don't need a round trip to Pi.
 
 import type { Db } from './db'
+import { HttpError } from './http'
 import type { Fetcher } from './settle'
 
 export const SESSION_MS = 30 * 24 * 60 * 60 * 1000
 export const PI_API = 'https://api.minepi.com'
-
-export class AuthError extends Error {
-  readonly status: number
-  constructor(status: number, message: string) {
-    super(message)
-    this.status = status
-  }
-}
 
 export interface PiUser {
   uid: string
@@ -25,10 +18,10 @@ export interface PiUser {
 /** GET /v2/me with the user's access token. 401 from Pi means a bad token. */
 export async function verifyPiToken(accessToken: string, fetcher: Fetcher, base = PI_API): Promise<PiUser> {
   const res = await fetcher(`${base}/v2/me`, { headers: { authorization: `Bearer ${accessToken}` } })
-  if (res.status === 401) throw new AuthError(401, 'Pi rejected the access token')
-  if (!res.ok) throw new AuthError(502, `Pi /v2/me returned ${res.status}`)
+  if (res.status === 401) throw new HttpError(401, 'Pi rejected the access token')
+  if (!res.ok) throw new HttpError(502, `Pi /v2/me returned ${res.status}`)
   const me = (await res.json()) as Partial<PiUser>
-  if (typeof me?.uid !== 'string' || !me.uid) throw new AuthError(502, 'Pi /v2/me returned no uid')
+  if (typeof me?.uid !== 'string' || !me.uid) throw new HttpError(502, 'Pi /v2/me returned no uid')
   // The username scope can be declined; fall back to a stable placeholder.
   const username = typeof me.username === 'string' && me.username ? me.username : `pioneer-${me.uid.slice(0, 6)}`
   return { uid: me.uid, username }

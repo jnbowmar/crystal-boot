@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { ApiError, createApi, type Auth, type User } from './api'
+import { ApiError, createApi, type Auth, type Config, type User } from './api'
+import { Leagues } from './Leagues'
 import { Matches } from './Matches'
 import { MyPicks } from './MyPicks'
-import { inPiBrowser, piSignIn } from './pi'
+import { inPiBrowser, piSignIn, takeIncompletePayment } from './pi'
 import { Table } from './Table'
 
 const SESSION_KEY = 'crystal-boot.session'
@@ -26,7 +27,16 @@ function store(key: string, value: string | null) {
   }
 }
 
-type Tab = 'matches' | 'picks' | 'table'
+type Tab = 'matches' | 'picks' | 'table' | 'leagues'
+
+// An invite link opens the app at /?join=CODE.
+function joinCodeFromUrl(): string | null {
+  try {
+    return new URLSearchParams(window.location.search).get('join')
+  } catch {
+    return null
+  }
+}
 type State =
   | { phase: 'starting' }
   | { phase: 'signing-in' }
@@ -36,9 +46,11 @@ type State =
 export function App({ signIn = piSignIn }: { signIn?: typeof piSignIn }) {
   const auth = useRef<Auth>(null)
   const api = useMemo(() => createApi(() => auth.current), [])
-  const [config, setConfig] = useState<{ piSandbox: boolean; fakeUsers: boolean } | null>(null)
+  const [config, setConfig] = useState<Config | null>(null)
   const [state, setState] = useState<State>({ phase: 'starting' })
-  const [tab, setTab] = useState<Tab>('matches')
+  const [joinCode] = useState(joinCodeFromUrl)
+  const [tab, setTab] = useState<Tab>(joinCode ? 'leagues' : 'matches')
+  const [notice, setNotice] = useState<string | null>(null)
 
   const signInWithPi = useCallback(
     async (sandbox: boolean) => {
@@ -49,6 +61,14 @@ export function App({ signIn = piSignIn }: { signIn?: typeof piSignIn }) {
         auth.current = { kind: 'session', token }
         store(SESSION_KEY, token)
         setState({ phase: 'signed-in', user })
+        // Finish a payment the user signed last time but that never completed.
+        const leftover = takeIncompletePayment()
+        if (leftover) {
+          api.resumePayment(leftover).then(
+            (r) => r.status === 'completed' && setNotice(`Your league "${r.league.name}" is ready.`),
+            () => {},
+          )
+        }
       } catch (e) {
         auth.current = null
         setState({ phase: 'signed-out', error: e instanceof Error ? e.message : String(e) })
@@ -61,7 +81,7 @@ export function App({ signIn = piSignIn }: { signIn?: typeof piSignIn }) {
   useEffect(() => {
     let live = true
     ;(async () => {
-      let cfg = { piSandbox: false, fakeUsers: false }
+      let cfg: Config = { piSandbox: false, fakeUsers: false, leaguePrice: 0, payments: false }
       try {
         cfg = await api.config()
       } catch {
@@ -172,9 +192,24 @@ export function App({ signIn = piSignIn }: { signIn?: typeof piSignIn }) {
         </button>
       </header>
       <main className="content">
+        {notice && (
+          <p className="note" role="status">
+            {notice}
+          </p>
+        )}
         {tab === 'matches' && <Matches api={api} onUnauthorized={onUnauthorized} />}
         {tab === 'picks' && <MyPicks api={api} onUnauthorized={onUnauthorized} />}
         {tab === 'table' && <Table api={api} onUnauthorized={onUnauthorized} />}
+        {tab === 'leagues' && config && (
+          <Leagues
+            api={api}
+            config={config}
+            user={state.user}
+            joinCode={joinCode}
+            onUnauthorized={onUnauthorized}
+            signIn={signIn}
+          />
+        )}
         <Disclaimer />
       </main>
       <nav className="tabs" aria-label="Sections">
@@ -183,6 +218,7 @@ export function App({ signIn = piSignIn }: { signIn?: typeof piSignIn }) {
             ['matches', 'Matches'],
             ['picks', 'My picks'],
             ['table', 'Table'],
+            ['leagues', 'Leagues'],
           ] as const
         ).map(([id, label]) => (
           <button key={id} aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id)}>

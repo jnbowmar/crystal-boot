@@ -109,7 +109,7 @@ Cloudflare Worker (API)
 | M1 | ~~`scoring.ts` + tests~~ **DONE 2026-09-23**: `src/scoring/scoring.ts`, 21 vitest tests incl. 693-case parity with `fed_calls/score.py` (`npm test`, `npm run parity`) | green tests, including a worked example |
 | M2 | ~~Worker + D1 + cron settlement, no auth (fake users)~~ **DONE 2026-09-26**, see "M2 results" below. Runs locally; deploying needs a Cloudflare account | matches from 9/20 settle and score correctly |
 | M3 | React pick flow at 375px + Pi auth in the Pi Browser sandbox. **Built 2026-09-26**, see "M3 results"; the proof needs a deploy and the Pi sandbox | James makes real picks for next weekend's EPL (10/10 at the earliest) |
-| M4 | Private leagues + testnet Pi payment for creating one | full approve→sign→complete loop, cancel handled |
+| M4 | Private leagues + testnet Pi payment for creating one. **Built 2026-09-26**, see "M4 results"; the real-Pi run needs the sandbox | full approve→sign→complete loop, cancel handled |
 | M5 | #PiHackathon entry: video, README, public repo (MIT, decided 2026-09-23) | submitted by the last day of the month |
 
 ## M0 results (2026-09-23)
@@ -160,6 +160,26 @@ The app is in `web/` (Vite + React 19); Pi sign-in is in `src/worker/auth.ts`, w
 - **Pick screen:** quick mode gives the chosen outcome the confidence level and splits the rest by the league's base rates. Exact mode has three linked sliders that keep the other two in proportion. Both show the points you'd get for each result before you save.
 - **No external links** in the app (listing rule), and the palette is pitch green and ice (no Pi purple or gold).
 - **`FAKE_USERS` and `PI_SANDBOX` are Worker vars read by the app at runtime** (`GET /api/config`), so one build works for dev, sandbox and mainnet. **Set `FAKE_USERS` to "0" before mainnet.**
+
+## M4 results (2026-09-26)
+
+Private leagues are in `src/worker/leagues.ts`, payments in `src/worker/payments.ts`, and the schema in `migrations/0003_leagues_payments.sql` (orders, leagues, league_members). The app has a fourth tab, Leagues.
+
+- **Checked:**
+  - `src/worker/payments.test.ts` runs the full approve → sign → complete loop against `FakePi`, a stateful fake of Pi's Platform API, plus the cancel cases and each way a tampered client could try to cheat.
+  - `web/src/Leagues.test.tsx` runs the same loop through the React app with a fake SDK, including cancelling in the wallet, an invite link, and an unfinished payment finished at the next sign-in.
+  - I ran it under `wrangler dev` (workerd) with a stub Pi server and Chromium at 375px: a cancelled payment (approved, then backed out: nothing delivered), a paid one (GET → approve → GET → complete → league) and a second player joining by link.
+- **Found by the real-runtime run:** calling the global `fetch` as a method (`this.fetcher(...)`) throws "Illegal invocation" in workerd but not in Node, so every approval would have failed in production. `src/worker/index.ts` now wraps `fetch`, and `index.test.ts` would catch it coming back.
+- **Not checked:** real Pi. The SDK host is blocked from the build environment, so the proof ("full approve→sign→complete loop, cancel handled") still needs one run in the Pi sandbox with testnet Pi.
+
+**Decisions made in M4:**
+- **Price: 0.5 Pi** (the low end of the 2026-09-23 re-price), set by `LEAGUE_PRICE_PI`. I couldn't check current mining rates from here, so **re-check them before mainnet**. The price shows in Pi only, never in dollars.
+- **Deliver only on Pi's word.** A league is created only when Pi's own record of the payment is developer-completed with a verified transaction and the matching txid. Delivery is keyed on the order (`leagues.order_id` is UNIQUE), so SDK retries and resumed payments can't create a second league.
+- **Every payment check reads Pi's record, not the client's:** the user, the order (`metadata.orderId`), the exact amount, the direction and the network (`PI_NETWORK`, "Pi Testnet" now). One order takes one payment.
+- **A cancel only counts while there's no transaction.** If Pi shows a signed transaction, the order is completed and delivered even if the app had reported a cancel, because we were paid.
+- **Pi sign-in now asks for `payments` as well as `username`**, so players approve once more. Before paying, the app runs `Pi.authenticate` again, because Pi needs it in the same page load as `createPayment`. That's also when an unfinished payment gets reported.
+- **Test players can join leagues but can't pay.** With no `PI_API_KEY` set, the server refuses orders (503), and the app says payments aren't switched on.
+- **League rules:** names are 3-40 characters. Invite codes are 8 characters from an alphabet without 0/O/1/I, and typing them is forgiving about case, spaces and dashes. There are at most 500 players per league (enforced inside the insert). The creator can't leave. League tables are members only.
 
 ## Open questions
 

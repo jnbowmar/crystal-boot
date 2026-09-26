@@ -3,7 +3,15 @@ import type { League } from '../../src/scoring/scoring'
 import type { Api, Leaderboard } from './api'
 import { LEAGUE_NAME } from './Matches'
 
-export function Table({ api, onUnauthorized }: { api: Api; onUnauthorized: (e: unknown) => boolean }) {
+export function Table({
+  api,
+  onUnauthorized,
+  scope = 'global',
+}: {
+  api: Api
+  onUnauthorized: (e: unknown) => boolean
+  scope?: string
+}) {
   const [period, setPeriod] = useState<'week' | 'season'>('week')
   const [league, setLeague] = useState<League | 'all'>('all')
   const [board, setBoard] = useState<Leaderboard | null>(null)
@@ -13,7 +21,7 @@ export function Table({ api, onUnauthorized }: { api: Api; onUnauthorized: (e: u
     let live = true
     setBoard(null)
     setError(null)
-    api.leaderboard(period, league).then(
+    api.leaderboard(period, league, scope).then(
       (b) => live && setBoard(b),
       (e) => {
         if (live && !onUnauthorized(e)) setError(e instanceof Error ? e.message : String(e))
@@ -22,7 +30,7 @@ export function Table({ api, onUnauthorized }: { api: Api; onUnauthorized: (e: u
     return () => {
       live = false
     }
-  }, [api, period, league, onUnauthorized])
+  }, [api, period, league, scope, onUnauthorized])
 
   const me = board?.me
 

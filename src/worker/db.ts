@@ -22,6 +22,12 @@ export interface Env {
   PI_SANDBOX?: string
   /** Pi Platform API base URL; defaults to https://api.minepi.com. */
   PI_API?: string
+  /** Pi app Server API Key (secret). Unset means payments are off. */
+  PI_API_KEY?: string
+  /** The Pi network payments must be on: "Pi Testnet" (default) or "Pi Network". */
+  PI_NETWORK?: string
+  /** Price of creating a private league, in Pi. Defaults to 0.5. */
+  LEAGUE_PRICE_PI?: string
   /** Bearer token for /admin routes. Unset means /admin is off. */
   ADMIN_TOKEN?: string
 }

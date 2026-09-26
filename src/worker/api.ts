@@ -18,72 +18,28 @@ import {
   type Probs,
   type ScoredPick,
 } from '../scoring/scoring'
-import { AuthError, sessionUser, startSession, verifyPiToken } from './auth'
+import { startSession, verifyPiToken } from './auth'
 import type { Env } from './db'
+import { HttpError, currentUser, json, readJson, requireUser } from './http'
+import {
+  DEFAULT_LEAGUE_PRICE_PI,
+  joinLeague,
+  leagueByCode,
+  leagueName,
+  leaveLeague,
+  myLeagues,
+  requireMember,
+} from './leagues'
+import { approvePayment, cancelPayment, completePayment, createOrder } from './payments'
 import { settle, sync, type Fetcher } from './settle'
 
 const DAY = 24 * 60 * 60 * 1000
-
-class HttpError extends Error {
-  readonly status: number
-  constructor(status: number, message: string) {
-    super(message)
-    this.status = status
-  }
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-  })
-}
 
 function isLeague(s: string | null): s is League {
   return s !== null && Object.hasOwn(LEAGUES, s)
 }
 
 export const LEAGUE_IDS = Object.keys(LEAGUES) as League[]
-
-async function readJson(req: Request): Promise<Record<string, unknown>> {
-  try {
-    const body = await req.json()
-    if (body && typeof body === 'object' && !Array.isArray(body)) return body as Record<string, unknown>
-  } catch {
-    // fall through
-  }
-  throw new HttpError(400, 'body must be a JSON object')
-}
-
-const USERNAME = /^[A-Za-z0-9_]{3,20}$/
-
-/**
- * The calling player, or null for an anonymous request. A session token that
- * is unknown or expired is a 401, so the app knows to sign in again.
- */
-async function currentUser(req: Request, env: Env, now: number): Promise<string | null> {
-  const auth = req.headers.get('authorization')
-  if (auth !== null) {
-    const token = /^Bearer (\S+)$/.exec(auth)?.[1]
-    const user = token ? await sessionUser(env.DB, token, now) : null
-    if (user === null) throw new HttpError(401, 'session expired, sign in again')
-    return user
-  }
-  const name = req.headers.get('x-fake-user')
-  if (name === null || env.FAKE_USERS !== '1') return null
-  if (!USERNAME.test(name)) throw new HttpError(400, 'X-Fake-User must be 3-20 letters, digits or _')
-  const id = `fake:${name}`
-  await env.DB.prepare('INSERT INTO users (id, username, created_at) VALUES (?1, ?2, ?3) ON CONFLICT DO NOTHING')
-    .bind(id, name, now)
-    .run()
-  return id
-}
-
-async function requireUser(req: Request, env: Env, now: number): Promise<string> {
-  const user = await currentUser(req, env, now)
-  if (user === null) throw new HttpError(401, 'sign in required')
-  return user
-}
 
 /** POST /api/auth {accessToken}: verify with Pi, start a session. */
 async function postAuth(req: Request, env: Env, now: number, fetcher: Fetcher): Promise<Response> {
@@ -260,10 +216,16 @@ export function weekOf(t: number): { start: number; end: number } {
 }
 
 /**
- * GET /api/leaderboard?league=en.1|all&period=week|season&date=YYYY-MM-DD
- * Global scope only in M2; country and private leagues come later.
+ * GET /api/leaderboard?league=en.1|all&period=week|season&date=YYYY-MM-DD&scope=global|league:<id>
+ * `league` is the competition; `scope` narrows the players to a private
+ * league's members (members only).
  */
 async function getLeaderboard(req: Request, env: Env, url: URL, now: number): Promise<Response> {
+  const scope = url.searchParams.get('scope') ?? 'global'
+  const privateLeague = scope.startsWith('league:') ? scope.slice('league:'.length) : null
+  if (scope !== 'global' && !privateLeague) throw new HttpError(400, 'scope must be global or league:<id>')
+  const user = await currentUser(req, env, now)
+  if (privateLeague) await requireMember(env.DB, user, privateLeague)
   const league = url.searchParams.get('league') ?? 'all'
   if (league !== 'all' && !isLeague(league)) throw new HttpError(400, `unknown league ${league}`)
   const period = url.searchParams.get('period') ?? 'season'
@@ -279,15 +241,15 @@ async function getLeaderboard(req: Request, env: Env, url: URL, now: number): Pr
     `SELECT p.user_id AS userId, p.match_id AS matchId, p.points, u.username
      FROM picks p JOIN matches m ON m.id = p.match_id JOIN users u ON u.id = p.user_id
      WHERE m.status = 'settled' AND p.points IS NOT NULL
-       AND (?1 = 'all' OR m.league = ?1) AND m.kickoff_at >= ?2 AND m.kickoff_at < ?3`,
+       AND (?1 = 'all' OR m.league = ?1) AND m.kickoff_at >= ?2 AND m.kickoff_at < ?3
+       AND (?4 IS NULL OR p.user_id IN (SELECT user_id FROM league_members WHERE league_id = ?4))`,
   )
-    .bind(league, start, end)
+    .bind(league, start, end, privateLeague)
     .all<ScoredPick & { username: string }>()
   const names = new Map(results.map((r) => [r.userId, r.username]))
   const minPicks = MIN_PICKS[period]
   const standings = leaderboard(results, minPicks).map((s) => ({ ...s, username: names.get(s.userId) }))
   // The caller's own line, even before they have enough picks to be ranked.
-  const user = await currentUser(req, env, now)
   let me = null
   if (user !== null) {
     const mine = results.filter((r) => r.userId === user)
@@ -299,6 +261,7 @@ async function getLeaderboard(req: Request, env: Env, url: URL, now: number): Pr
     }
   }
   return json({
+    scope,
     league,
     period,
     ...(period === 'week' && { from: new Date(start).toISOString(), to: new Date(end).toISOString() }),
@@ -330,6 +293,43 @@ async function adminScore(req: Request, env: Env, now: number): Promise<Response
   return json(await settle(env.DB, now))
 }
 
+export function leaguePrice(env: Env): number {
+  const price = Number(env.LEAGUE_PRICE_PI)
+  return Number.isFinite(price) && price > 0 ? price : DEFAULT_LEAGUE_PRICE_PI
+}
+
+function paymentId(body: Record<string, unknown>): string {
+  if (typeof body.paymentId !== 'string' || !body.paymentId) throw new HttpError(400, 'paymentId is required')
+  return body.paymentId
+}
+
+/** POST /api/leagues/order {name}: the order to pay for with Pi.createPayment. */
+async function postLeagueOrder(req: Request, env: Env, now: number): Promise<Response> {
+  const user = await requireUser(req, env, now)
+  if (!env.PI_API_KEY) throw new HttpError(503, 'payments are not set up on this server')
+  const name = leagueName((await readJson(req)).name)
+  return json(await createOrder(env.DB, user, 'league', { name }, leaguePrice(env), `Crystal Boot league: ${name}`, now))
+}
+
+async function payments(action: string, req: Request, env: Env, now: number, fetcher: Fetcher): Promise<Response> {
+  const user = await requireUser(req, env, now)
+  const body = await readJson(req)
+  const id = paymentId(body)
+  switch (action) {
+    case 'approve':
+      return json(await approvePayment(env, fetcher, user, id, now))
+    case 'complete': {
+      if (typeof body.txid !== 'string' || !body.txid) throw new HttpError(400, 'txid is required')
+      return json(await completePayment(env, fetcher, user, id, body.txid, now))
+    }
+    case 'incomplete':
+      return json(await completePayment(env, fetcher, user, id, null, now))
+    case 'cancel':
+      return json(await cancelPayment(env, fetcher, user, id, now))
+  }
+  throw new HttpError(404, 'not found')
+}
+
 export async function handle(req: Request, env: Env, now: number, fetcher: Fetcher): Promise<Response> {
   const url = new URL(req.url)
   const route = `${req.method} ${url.pathname}`
@@ -338,7 +338,12 @@ export async function handle(req: Request, env: Env, now: number, fetcher: Fetch
       case 'GET /api/health':
         return json({ ok: true, now: new Date(now).toISOString() })
       case 'GET /api/config':
-        return json({ piSandbox: env.PI_SANDBOX === '1', fakeUsers: env.FAKE_USERS === '1' })
+        return json({
+          piSandbox: env.PI_SANDBOX === '1',
+          fakeUsers: env.FAKE_USERS === '1',
+          leaguePrice: leaguePrice(env),
+          payments: Boolean(env.PI_API_KEY),
+        })
       case 'POST /api/auth':
         return await postAuth(req, env, now, fetcher)
       case 'GET /api/me':
@@ -351,6 +356,28 @@ export async function handle(req: Request, env: Env, now: number, fetcher: Fetch
         return await postPick(req, env, now)
       case 'GET /api/leaderboard':
         return await getLeaderboard(req, env, url, now)
+      case 'GET /api/leagues':
+        return json({ leagues: await myLeagues(env.DB, await requireUser(req, env, now)) })
+      case 'GET /api/leagues/preview': {
+        const { name, members } = await leagueByCode(env.DB, url.searchParams.get('code'))
+        return json({ name, members })
+      }
+      case 'POST /api/leagues/order':
+        return await postLeagueOrder(req, env, now)
+      case 'POST /api/leagues/join': {
+        const user = await requireUser(req, env, now)
+        return json({ league: await joinLeague(env.DB, user, (await readJson(req)).code, now) })
+      }
+      case 'POST /api/leagues/leave': {
+        const user = await requireUser(req, env, now)
+        await leaveLeague(env.DB, user, (await readJson(req)).leagueId)
+        return json({ ok: true })
+      }
+      case 'POST /api/payments/approve':
+      case 'POST /api/payments/complete':
+      case 'POST /api/payments/incomplete':
+      case 'POST /api/payments/cancel':
+        return await payments(url.pathname.split('/').pop()!, req, env, now, fetcher)
       case 'POST /api/admin/sync':
         requireAdmin(req, env)
         return json(await sync(env.DB, now, fetcher, LEAGUE_IDS))
@@ -360,7 +387,7 @@ export async function handle(req: Request, env: Env, now: number, fetcher: Fetch
     }
     return json({ error: 'not found' }, 404)
   } catch (e) {
-    if (e instanceof HttpError || e instanceof AuthError) return json({ error: e.message }, e.status)
+    if (e instanceof HttpError) return json({ error: e.message }, e.status)
     console.error(route, e)
     return json({ error: 'internal error' }, 500)
   }

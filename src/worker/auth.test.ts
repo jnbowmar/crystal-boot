@@ -117,7 +117,7 @@ describe('Pi sign-in', () => {
   })
 
   it('reports the runtime config the app needs', async () => {
-    expect((await setup({ PI_SANDBOX: '1' }).call('GET', '/api/config')).body).toEqual({ piSandbox: true, fakeUsers: false })
-    expect((await setup({ FAKE_USERS: '1' }).call('GET', '/api/config')).body).toEqual({ piSandbox: false, fakeUsers: true })
+    expect((await setup({ PI_SANDBOX: '1' }).call('GET', '/api/config')).body).toEqual({ piSandbox: true, fakeUsers: false, leaguePrice: 0.5, payments: false })
+    expect((await setup({ FAKE_USERS: '1' }).call('GET', '/api/config')).body).toEqual({ piSandbox: false, fakeUsers: true, leaguePrice: 0.5, payments: false })
   })
 })

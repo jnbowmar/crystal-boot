@@ -47,6 +47,18 @@ A React app (Vite + TypeScript) in [`web/`](web/), built for a 375px phone scree
 
 Sign-in is Pi only. The app calls `Pi.authenticate(['username'])` and sends the access token to `POST /api/auth`. The Worker checks it against Pi's `/v2/me`, which is the source of truth, and returns its own 30-day session token. Only a SHA-256 hash of that token is stored.
 
+## Private leagues and Pi payments
+
+Anyone can start a private league for a one-off Pi payment (0.5 testnet Pi for now, set by `LEAGUE_PRICE_PI`) and invite friends with an 8-character code or a `/?join=CODE` link. Joining is free. A league table is the main table filtered to its members, so everyone's picks count everywhere. Pi only ever goes in; nothing is paid out on results.
+
+Payments follow Pi's three-phase flow, in [`src/worker/payments.ts`](src/worker/payments.ts):
+
+1. The app asks for an order (`POST /api/leagues/order`), then calls `Pi.createPayment` with the order id in the metadata.
+2. `onReadyForServerApproval` → `POST /api/payments/approve`. The Worker reads the payment from Pi with the Server API Key and checks it against the order: same user, same order, same amount, user-to-app, right network. Then it binds the payment to the order and approves it with Pi.
+3. The user signs. `onReadyForServerCompletion` → `POST /api/payments/complete`. The Worker calls Pi's `/complete`. It creates the league only when Pi's own record shows the payment developer-completed with a verified transaction and a matching txid.
+
+The client is never trusted about money. Approve and complete are idempotent because the SDK retries them. A cancel is honoured only while there's no transaction. A payment the user signed but never completed (the app closed mid-flow) comes back through `onIncompletePaymentFound` at the next sign-in and gets finished then (`POST /api/payments/incomplete`).
+
 ## The backend
 
 A Cloudflare Worker with a D1 (SQLite) database, in [`src/worker/`](src/worker/). It also serves the built app as static files, with `/api/*` going to the Worker. Every 6 hours a cron job pulls the openfootball feeds, upserts matches, settles the ones that have a score and scores their picks. Each step is a single SQL statement, so a run takes a handful of D1 queries however many picks there are.
@@ -57,7 +69,11 @@ A Cloudflare Worker with a D1 (SQLite) database, in [`src/worker/`](src/worker/)
 | `GET /api/matches?league=en.1&from=&to=` | Fixtures with status, result, crowd forecast and your pick |
 | `POST /api/picks` | `{matchId, pick: {H, D, A}}` or two-tap `{matchId, outcome, confidence}`. Refused from kickoff on |
 | `GET /api/picks` | Your picks and points |
-| `GET /api/leaderboard?league=all&period=week\|season&date=` | Average points, minimum pick count applies, plus your own line |
+| `GET /api/leaderboard?league=all&period=week\|season&date=&scope=global\|league:<id>` | Average points, minimum pick count applies, plus your own line. League scope is members only |
+| `GET /api/leagues`, `POST /api/leagues/join`, `POST /api/leagues/leave` | Your leagues; join with a code (free); leave |
+| `GET /api/leagues/preview?code=` | A league's name and size, before joining |
+| `POST /api/leagues/order` | `{name}` → the order to pay for with `Pi.createPayment` |
+| `POST /api/payments/approve`, `complete`, `cancel`, `incomplete` | The Pi payment callbacks (see above) |
 | `POST /api/admin/sync`, `POST /api/admin/score` | Run the cron now; enter a result by hand (bearer `ADMIN_TOKEN`) |
 
 With `FAKE_USERS=1`, an `X-Fake-User: <name>` header works in place of Pi sign-in, and the sign-in screen offers a test-player box. That setting is for dev and testnet only.
@@ -73,7 +89,7 @@ curl -X POST "localhost:8787/cdn-cgi/handler/scheduled?cron=0+*/6+*+*+*"   # run
 
 For live reload while working on the app, also run `npm run dev:web` (Vite on :5173, proxying `/api` to :8787).
 
-To deploy: `npx wrangler d1 create crystal-boot`, put the id in `wrangler.jsonc`, then `npm run db:migrate:remote`, `npx wrangler secret put ADMIN_TOKEN` and `npm run deploy`. To try it in the Pi sandbox, open `develop.pi` in the Pi Browser, register the app, set its development URL to the deployed Worker, and open the sandbox URL the portal gives you (see [Pi's docs](https://github.com/pi-apps/pi-platform-docs)).
+To deploy: `npx wrangler d1 create crystal-boot`, put the id in `wrangler.jsonc`, then `npm run db:migrate:remote`, `npx wrangler secret put ADMIN_TOKEN`, `npx wrangler secret put PI_API_KEY` (from the Pi Developer Portal) and `npm run deploy`. To try it in the Pi sandbox, open `develop.pi` in the Pi Browser, register the app, set its development URL to the deployed Worker, and open the sandbox URL the portal gives you (see [Pi's docs](https://github.com/pi-apps/pi-platform-docs)).
 
 ## Run the tests
 
@@ -83,6 +99,8 @@ npm test
 ```
 
 The app tests render the real React app on jsdom, wired straight into the Worker's handler and SQL, with only Pi stubbed. They cover sign-in, a two-tap pick, an exact pick, locking at kickoff, an expired session and test players.
+
+The payment tests run the whole approve → sign → complete loop against `FakePi` (`src/worker/testing/fakePi.ts`), a stateful stand-in for Pi's API that enforces Pi's rules. They cover cancels, SDK retries, a Pi outage mid-completion, an unverified transaction, an unfinished payment resumed at sign-in, and the ways a tampered client could try to cheat: wrong amount, someone else's order, a made-up txid, the wrong network, and two payments for one order. In every one, no league is delivered unless Pi confirms.
 
 The Worker tests run the real SQL and migrations on `node:sqlite`, against snapshots of the live 2026-27 feeds. They replay the weekend of 18-20 September: a dozen fake players pick all 20 matches, then the next sync settles them, and every pick's points, every crowd forecast and the weekly leaderboard must match `scoring.ts` exactly. Another test checks the SQL points formula against `points()` for every possible pick.
 
@@ -96,7 +114,7 @@ The suite also includes a 693-case parity check against the Python Brier functio
 | M1 | Scoring module and tests | done |
 | M2 | Cloudflare Worker, D1 database, scheduled settlement | done (runs locally; not deployed yet) |
 | M3 | React pick flow and Pi sign-in in the Pi Browser | built; waiting on a Pi sandbox test |
-| M4 | Private leagues paid in testnet Pi | |
+| M4 | Private leagues paid in testnet Pi | built; waiting on a Pi sandbox test |
 | M5 | Hackathon submission | |
 
 ## Data

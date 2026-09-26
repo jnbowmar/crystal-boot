@@ -104,7 +104,7 @@ export async function settle(db: Db, now: number): Promise<{ settled: number; vo
 
 export type Fetcher = (
   url: string,
-  init?: { headers?: Record<string, string> },
+  init?: { method?: string; headers?: Record<string, string>; body?: string },
 ) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>
 
 export interface SyncReport {

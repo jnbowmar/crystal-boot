@@ -29,6 +29,7 @@ export interface Standing {
 }
 
 export interface Leaderboard {
+  scope: string
   league: League | 'all'
   period: 'week' | 'season'
   from?: string
@@ -37,6 +38,33 @@ export interface Leaderboard {
   standings: Standing[]
   me: Standing | null
 }
+
+export interface LeagueView {
+  id: string
+  name: string
+  inviteCode: string
+  ownerId: string
+  members: number
+  isOwner?: boolean
+}
+
+export interface Config {
+  piSandbox: boolean
+  fakeUsers: boolean
+  leaguePrice: number
+  payments: boolean
+}
+
+export interface Order {
+  orderId: string
+  amount: number
+  memo: string
+  metadata: { orderId: string }
+}
+
+export type PaymentResult =
+  | { status: 'completed'; orderId: string; league: LeagueView }
+  | { status: 'no-transaction'; orderId: string }
 
 export interface User {
   id: string
@@ -81,7 +109,7 @@ export function createApi(getAuth: () => Auth, fetcher: typeof fetch = (...a) =>
   }
 
   return {
-    config: () => call<{ piSandbox: boolean; fakeUsers: boolean }>('GET', '/config'),
+    config: () => call<Config>('GET', '/config'),
     auth: (accessToken: string) =>
       call<{ token: string; expiresAt: string; user: User }>('POST', '/auth', { accessToken }),
     me: () => call<{ user: User }>('GET', '/me'),
@@ -93,8 +121,19 @@ export function createApi(getAuth: () => Auth, fetcher: typeof fetch = (...a) =>
     picks: () => call<{ picks: Match[] }>('GET', '/picks'),
     savePick: (matchId: string, body: PickBody) =>
       call<{ matchId: string; pick: Probs }>('POST', '/picks', { matchId, ...body }),
-    leaderboard: (period: 'week' | 'season', league: League | 'all') =>
-      call<Leaderboard>('GET', `/leaderboard?${new URLSearchParams({ period, league })}`),
+    leaderboard: (period: 'week' | 'season', league: League | 'all', scope = 'global') =>
+      call<Leaderboard>('GET', `/leaderboard?${new URLSearchParams({ period, league, scope })}`),
+    leagues: () => call<{ leagues: LeagueView[] }>('GET', '/leagues'),
+    leaguePreview: (code: string) =>
+      call<{ name: string; members: number }>('GET', `/leagues/preview?${new URLSearchParams({ code })}`),
+    orderLeague: (name: string) => call<Order>('POST', '/leagues/order', { name }),
+    joinLeague: (code: string) => call<{ league: LeagueView }>('POST', '/leagues/join', { code }),
+    leaveLeague: (leagueId: string) => call<{ ok: true }>('POST', '/leagues/leave', { leagueId }),
+    approvePayment: (paymentId: string) => call<unknown>('POST', '/payments/approve', { paymentId }),
+    completePayment: (paymentId: string, txid: string) =>
+      call<PaymentResult>('POST', '/payments/complete', { paymentId, txid }),
+    cancelPayment: (paymentId: string) => call<unknown>('POST', '/payments/cancel', { paymentId }),
+    resumePayment: (paymentId: string) => call<PaymentResult>('POST', '/payments/incomplete', { paymentId }),
   }
 }
 

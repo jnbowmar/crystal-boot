@@ -49,7 +49,11 @@ beforeEach(async () => {
   vi.stubGlobal('fetch', (input: string, init?: RequestInit) =>
     handle(new Request(`https://app.test${input}`, init), env, Date.now(), piMe),
   )
-  window.Pi = { init: () => {}, authenticate: async () => ({ accessToken: 'unused', user: { uid: 'x' } }) }
+  window.Pi = {
+    init: () => {},
+    authenticate: async () => ({ accessToken: 'unused', user: { uid: 'x' } }),
+    createPayment: () => {},
+  }
 })
 
 afterEach(() => {
