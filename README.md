@@ -93,12 +93,12 @@ A Cloudflare Worker with a D1 (SQLite) database, in [`src/worker/`](src/worker/)
 | `POST /api/payments/approve`, `complete`, `cancel`, `incomplete` | The Pi payment callbacks (see above) |
 | `POST /api/admin/sync`, `POST /api/admin/score` | Run the cron now; enter a result by hand (bearer `ADMIN_TOKEN`) |
 
-With `FAKE_USERS=1`, an `X-Fake-User: <name>` header works in place of Pi sign-in, and the sign-in screen offers a test-player box. That setting is for dev and testnet only.
+With `FAKE_USERS=1`, an `X-Fake-User: <name>` header works in place of Pi sign-in, and the sign-in screen offers a test-player box. It's `"0"` in `wrangler.jsonc`, so deploys only accept Pi sign-in; local dev turns it on in `.dev.vars`.
 
 Run it locally:
 
 ```bash
-echo "ADMIN_TOKEN=dev-admin" > .dev.vars
+printf 'ADMIN_TOKEN=dev-admin\nFAKE_USERS=1\n' > .dev.vars   # local only; test players on
 npm run db:migrate:local
 npm run dev                                   # builds the app, serves everything on http://localhost:8787
 curl -X POST "localhost:8787/cdn-cgi/handler/scheduled?cron=0+*/6+*+*+*"   # run the cron once
