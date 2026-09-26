@@ -1,5 +1,7 @@
-// HTTP API. M2 has no real auth: with FAKE_USERS=1 the X-Fake-User header
-// names the player. M3 swaps that for a Pi access token checked against /v2/me.
+// HTTP API, under /api (the Worker serves the app's static files for
+// everything else). Players sign in with Pi (auth.ts) and send
+// Authorization: Bearer <session>. With FAKE_USERS=1, an X-Fake-User header
+// works instead, for local dev and tests.
 
 import { LEAGUES } from '../data/openfootball'
 import {
@@ -16,6 +18,7 @@ import {
   type Probs,
   type ScoredPick,
 } from '../scoring/scoring'
+import { AuthError, sessionUser, startSession, verifyPiToken } from './auth'
 import type { Env } from './db'
 import { settle, sync, type Fetcher } from './settle'
 
@@ -29,16 +32,10 @@ class HttpError extends Error {
   }
 }
 
-const CORS = {
-  'access-control-allow-origin': '*',
-  'access-control-allow-methods': 'GET, POST, OPTIONS',
-  'access-control-allow-headers': 'content-type, authorization, x-fake-user',
-}
-
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8', ...CORS },
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
   })
 }
 
@@ -60,8 +57,18 @@ async function readJson(req: Request): Promise<Record<string, unknown>> {
 
 const USERNAME = /^[A-Za-z0-9_]{3,20}$/
 
-/** The calling player, created on first sight. Null when the request has no identity. */
+/**
+ * The calling player, or null for an anonymous request. A session token that
+ * is unknown or expired is a 401, so the app knows to sign in again.
+ */
 async function currentUser(req: Request, env: Env, now: number): Promise<string | null> {
+  const auth = req.headers.get('authorization')
+  if (auth !== null) {
+    const token = /^Bearer (\S+)$/.exec(auth)?.[1]
+    const user = token ? await sessionUser(env.DB, token, now) : null
+    if (user === null) throw new HttpError(401, 'session expired, sign in again')
+    return user
+  }
   const name = req.headers.get('x-fake-user')
   if (name === null || env.FAKE_USERS !== '1') return null
   if (!USERNAME.test(name)) throw new HttpError(400, 'X-Fake-User must be 3-20 letters, digits or _')
@@ -76,6 +83,23 @@ async function requireUser(req: Request, env: Env, now: number): Promise<string>
   const user = await currentUser(req, env, now)
   if (user === null) throw new HttpError(401, 'sign in required')
   return user
+}
+
+/** POST /api/auth {accessToken}: verify with Pi, start a session. */
+async function postAuth(req: Request, env: Env, now: number, fetcher: Fetcher): Promise<Response> {
+  const { accessToken } = await readJson(req)
+  if (typeof accessToken !== 'string' || !accessToken) throw new HttpError(400, 'accessToken is required')
+  const pi = await verifyPiToken(accessToken, fetcher, env.PI_API || undefined)
+  const id = `pi:${pi.uid}`
+  const session = await startSession(env.DB, { id, username: pi.username }, now)
+  return json({ token: session.token, expiresAt: new Date(session.expiresAt).toISOString(), user: { id, username: pi.username } })
+}
+
+/** GET /api/me: who the session belongs to. */
+async function getMe(req: Request, env: Env, now: number): Promise<Response> {
+  const id = await requireUser(req, env, now)
+  const user = await env.DB.prepare('SELECT id, username FROM users WHERE id = ?1').bind(id).first()
+  return json({ user })
 }
 
 function requireAdmin(req: Request, env: Env): void {
@@ -144,7 +168,7 @@ function isoDate(t: number): string {
   return new Date(t).toISOString().slice(0, 10)
 }
 
-/** GET /matches?league=en.1&from=YYYY-MM-DD&to=YYYY-MM-DD (league-local dates). */
+/** GET /api/matches?league=en.1&from=YYYY-MM-DD&to=YYYY-MM-DD (league-local dates). */
 async function getMatches(req: Request, env: Env, url: URL, now: number): Promise<Response> {
   const league = url.searchParams.get('league')
   if (league !== null && !isLeague(league)) throw new HttpError(400, `unknown league ${league}`)
@@ -162,7 +186,7 @@ async function getMatches(req: Request, env: Env, url: URL, now: number): Promis
   return json({ matches: results.map((m) => matchView(m, now)) })
 }
 
-/** GET /picks: the caller's picks, newest kickoff first. */
+/** GET /api/picks: the caller's picks, newest kickoff first. */
 async function getPicks(req: Request, env: Env, now: number): Promise<Response> {
   const user = await requireUser(req, env, now)
   const { results } = await env.DB.prepare(
@@ -176,7 +200,7 @@ async function getPicks(req: Request, env: Env, now: number): Promise<Response> 
 }
 
 /**
- * POST /picks with {matchId, pick: {H, D, A}} (whole percentages) or the
+ * POST /api/picks with {matchId, pick: {H, D, A}} (whole percentages) or the
  * two-tap {matchId, outcome: 'H'|'D'|'A', confidence: 'lean'|...|'lock'}.
  * Replaces any earlier pick until kickoff. The server clock is the only clock.
  */
@@ -236,10 +260,10 @@ export function weekOf(t: number): { start: number; end: number } {
 }
 
 /**
- * GET /leaderboard?league=en.1|all&period=week|season&date=YYYY-MM-DD
+ * GET /api/leaderboard?league=en.1|all&period=week|season&date=YYYY-MM-DD
  * Global scope only in M2; country and private leagues come later.
  */
-async function getLeaderboard(env: Env, url: URL, now: number): Promise<Response> {
+async function getLeaderboard(req: Request, env: Env, url: URL, now: number): Promise<Response> {
   const league = url.searchParams.get('league') ?? 'all'
   if (league !== 'all' && !isLeague(league)) throw new HttpError(400, `unknown league ${league}`)
   const period = url.searchParams.get('period') ?? 'season'
@@ -262,16 +286,29 @@ async function getLeaderboard(env: Env, url: URL, now: number): Promise<Response
   const names = new Map(results.map((r) => [r.userId, r.username]))
   const minPicks = MIN_PICKS[period]
   const standings = leaderboard(results, minPicks).map((s) => ({ ...s, username: names.get(s.userId) }))
+  // The caller's own line, even before they have enough picks to be ranked.
+  const user = await currentUser(req, env, now)
+  let me = null
+  if (user !== null) {
+    const mine = results.filter((r) => r.userId === user)
+    me = standings.find((s) => s.userId === user) ?? {
+      rank: null,
+      userId: user,
+      picks: mine.length,
+      avgPoints: mine.length ? mine.reduce((t, r) => t + r.points, 0) / mine.length : null,
+    }
+  }
   return json({
     league,
     period,
     ...(period === 'week' && { from: new Date(start).toISOString(), to: new Date(end).toISOString() }),
     minPicks,
     standings,
+    me,
   })
 }
 
-/** POST /admin/score {matchId, home, away}: enter a result by hand, then settle. */
+/** POST /api/admin/score {matchId, home, away}: enter a result by hand, then settle. */
 async function adminScore(req: Request, env: Env, now: number): Promise<Response> {
   const { matchId, home, away } = await readJson(req)
   if (typeof matchId !== 'string') throw new HttpError(400, 'matchId is required')
@@ -298,29 +335,33 @@ export async function handle(req: Request, env: Env, now: number, fetcher: Fetch
   const route = `${req.method} ${url.pathname}`
   try {
     switch (route) {
-      case 'GET /health':
+      case 'GET /api/health':
         return json({ ok: true, now: new Date(now).toISOString() })
-      case 'GET /matches':
+      case 'GET /api/config':
+        return json({ piSandbox: env.PI_SANDBOX === '1', fakeUsers: env.FAKE_USERS === '1' })
+      case 'POST /api/auth':
+        return await postAuth(req, env, now, fetcher)
+      case 'GET /api/me':
+        return await getMe(req, env, now)
+      case 'GET /api/matches':
         return await getMatches(req, env, url, now)
-      case 'GET /picks':
+      case 'GET /api/picks':
         return await getPicks(req, env, now)
-      case 'POST /picks':
+      case 'POST /api/picks':
         return await postPick(req, env, now)
-      case 'GET /leaderboard':
-        return await getLeaderboard(env, url, now)
-      case 'POST /admin/sync':
+      case 'GET /api/leaderboard':
+        return await getLeaderboard(req, env, url, now)
+      case 'POST /api/admin/sync':
         requireAdmin(req, env)
         return json(await sync(env.DB, now, fetcher, LEAGUE_IDS))
-      case 'POST /admin/score':
+      case 'POST /api/admin/score':
         requireAdmin(req, env)
         return await adminScore(req, env, now)
     }
-    if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
     return json({ error: 'not found' }, 404)
   } catch (e) {
-    if (e instanceof HttpError) return json({ error: e.message }, e.status)
+    if (e instanceof HttpError || e instanceof AuthError) return json({ error: e.message }, e.status)
     console.error(route, e)
     return json({ error: 'internal error' }, 500)
   }
 }
-

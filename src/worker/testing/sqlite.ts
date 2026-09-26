@@ -3,8 +3,12 @@
 
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
+import type { DatabaseSync, SQLInputValue } from 'node:sqlite'
 import type { Db, Stmt } from '../db'
+
+// Loaded this way because Vite's client environment (used by the jsdom app
+// tests) doesn't know node:sqlite is a Node built-in and tries to bundle it.
+const { DatabaseSync: Sqlite } = process.getBuiltinModule('node:sqlite') as typeof import('node:sqlite')
 
 const MIGRATIONS = join(import.meta.dirname, '..', '..', '..', 'migrations')
 
@@ -41,7 +45,7 @@ class SqliteStmt implements Stmt {
 }
 
 export function testDb(): Db & { sqlite: DatabaseSync } {
-  const sqlite = new DatabaseSync(':memory:')
+  const sqlite = new Sqlite(':memory:')
   for (const f of readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort()) {
     sqlite.exec(readFileSync(join(MIGRATIONS, f), 'utf8'))
   }

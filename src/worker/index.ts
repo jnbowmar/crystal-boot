@@ -1,5 +1,6 @@
-// Cloudflare Worker entry: the HTTP API plus the 6-hourly cron that syncs
-// openfootball and settles finished matches.
+// Cloudflare Worker entry: the /api routes (static files for the app are
+// served by Workers assets, see wrangler.jsonc) plus the 6-hourly cron that
+// syncs openfootball and settles finished matches.
 
 import { LEAGUE_IDS, handle } from './api'
 import type { Env } from './db'

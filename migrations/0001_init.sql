@@ -2,8 +2,9 @@
 -- Times are ms since epoch (UTC), from the server clock.
 
 CREATE TABLE users (
-  id         TEXT PRIMARY KEY,        -- M2: 'fake:<username>'. M3: Pi uid.
-  username   TEXT NOT NULL UNIQUE,
+  id         TEXT PRIMARY KEY,        -- 'pi:<uid>', or 'fake:<username>' in dev
+  -- Not unique: a fake dev user and a Pi user can share a name.
+  username   TEXT NOT NULL,
   country    TEXT,
   created_at INTEGER NOT NULL
 );

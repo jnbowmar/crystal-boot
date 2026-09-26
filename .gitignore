@@ -3,3 +3,4 @@ node_modules/
 .wrangler/
 m0/data/
 .dev.vars
+web/dist/

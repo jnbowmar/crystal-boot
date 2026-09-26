@@ -102,7 +102,10 @@ export async function settle(db: Db, now: number): Promise<{ settled: number; vo
   return { settled: marked.meta.changes, voided: voided.meta.changes }
 }
 
-export type Fetcher = (url: string) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>
+export type Fetcher = (
+  url: string,
+  init?: { headers?: Record<string, string> },
+) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>
 
 export interface SyncReport {
   leagues: Record<string, { fixtures: number; skipped: number } | { error: string }>

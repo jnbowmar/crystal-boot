@@ -41,30 +41,39 @@ From five finished seasons (2021-22 to 2025-26) of [openfootball](https://github
 
 Reproduce with `python3 m0/base_rates.py`.
 
+## The app
+
+A React app (Vite + TypeScript) in [`web/`](web/), built for a 375px phone screen in the Pi Browser. You make a pick in two taps: choose Home, Draw or Away, then how sure you are. There's also an exact-percentage mode with three linked sliders. Before you save, it shows how many points you'd get for each result. Kickoff times show in your own timezone. It imports the same `scoring.ts` as the Worker, so its preview can't disagree with how a pick is actually scored.
+
+Sign-in is Pi only. The app calls `Pi.authenticate(['username'])` and sends the access token to `POST /api/auth`. The Worker checks it against Pi's `/v2/me`, which is the source of truth, and returns its own 30-day session token. Only a SHA-256 hash of that token is stored.
+
 ## The backend
 
-A Cloudflare Worker with a D1 (SQLite) database, in [`src/worker/`](src/worker/). Every 6 hours a cron job pulls the openfootball feeds, upserts matches, settles the ones that have a score and scores their picks. Each step is a single SQL statement, so a run takes a handful of D1 queries however many picks there are.
+A Cloudflare Worker with a D1 (SQLite) database, in [`src/worker/`](src/worker/). It also serves the built app as static files, with `/api/*` going to the Worker. Every 6 hours a cron job pulls the openfootball feeds, upserts matches, settles the ones that have a score and scores their picks. Each step is a single SQL statement, so a run takes a handful of D1 queries however many picks there are.
 
 | Route | What |
 |---|---|
-| `GET /matches?league=en.1&from=&to=` | Fixtures with status, result, crowd forecast and your pick |
-| `POST /picks` | `{matchId, pick: {H, D, A}}` or two-tap `{matchId, outcome, confidence}`. Refused from kickoff on |
-| `GET /picks` | Your picks and points |
-| `GET /leaderboard?league=all&period=week\|season&date=` | Average points, minimum pick count applies |
-| `POST /admin/sync`, `POST /admin/score` | Run the cron now; enter a result by hand (bearer `ADMIN_TOKEN`) |
+| `POST /api/auth` | `{accessToken}` from `Pi.authenticate` → session token |
+| `GET /api/matches?league=en.1&from=&to=` | Fixtures with status, result, crowd forecast and your pick |
+| `POST /api/picks` | `{matchId, pick: {H, D, A}}` or two-tap `{matchId, outcome, confidence}`. Refused from kickoff on |
+| `GET /api/picks` | Your picks and points |
+| `GET /api/leaderboard?league=all&period=week\|season&date=` | Average points, minimum pick count applies, plus your own line |
+| `POST /api/admin/sync`, `POST /api/admin/score` | Run the cron now; enter a result by hand (bearer `ADMIN_TOKEN`) |
 
-Until Pi sign-in lands in M3 there's no auth: with `FAKE_USERS=1`, an `X-Fake-User: <name>` header is the player.
+With `FAKE_USERS=1`, an `X-Fake-User: <name>` header works in place of Pi sign-in, and the sign-in screen offers a test-player box. That setting is for dev and testnet only.
 
 Run it locally:
 
 ```bash
 echo "ADMIN_TOKEN=dev-admin" > .dev.vars
 npm run db:migrate:local
-npm run dev                                   # http://localhost:8787
-curl "localhost:8787/__scheduled?cron=0+*/6+*+*+*"   # run the cron once
+npm run dev                                   # builds the app, serves everything on http://localhost:8787
+curl -X POST "localhost:8787/cdn-cgi/handler/scheduled?cron=0+*/6+*+*+*"   # run the cron once
 ```
 
-To deploy: `npx wrangler d1 create crystal-boot`, put the id in `wrangler.jsonc`, then `npm run db:migrate:remote`, `npx wrangler secret put ADMIN_TOKEN` and `npm run deploy`.
+For live reload while working on the app, also run `npm run dev:web` (Vite on :5173, proxying `/api` to :8787).
+
+To deploy: `npx wrangler d1 create crystal-boot`, put the id in `wrangler.jsonc`, then `npm run db:migrate:remote`, `npx wrangler secret put ADMIN_TOKEN` and `npm run deploy`. To try it in the Pi sandbox, open `develop.pi` in the Pi Browser, register the app, set its development URL to the deployed Worker, and open the sandbox URL the portal gives you (see [Pi's docs](https://github.com/pi-apps/pi-platform-docs)).
 
 ## Run the tests
 
@@ -72,6 +81,8 @@ To deploy: `npx wrangler d1 create crystal-boot`, put the id in `wrangler.jsonc`
 npm install
 npm test
 ```
+
+The app tests render the real React app on jsdom, wired straight into the Worker's handler and SQL, with only Pi stubbed. They cover sign-in, a two-tap pick, an exact pick, locking at kickoff, an expired session and test players.
 
 The Worker tests run the real SQL and migrations on `node:sqlite`, against snapshots of the live 2026-27 feeds. They replay the weekend of 18-20 September: a dozen fake players pick all 20 matches, then the next sync settles them, and every pick's points, every crowd forecast and the weekly leaderboard must match `scoring.ts` exactly. Another test checks the SQL points formula against `points()` for every possible pick.
 
@@ -84,7 +95,7 @@ The suite also includes a 693-case parity check against the Python Brier functio
 | M0 | Base rates and kickoff timezones from openfootball | done |
 | M1 | Scoring module and tests | done |
 | M2 | Cloudflare Worker, D1 database, scheduled settlement | done (runs locally; not deployed yet) |
-| M3 | React pick flow and Pi sign-in in the Pi Browser | next |
+| M3 | React pick flow and Pi sign-in in the Pi Browser | built; waiting on a Pi sandbox test |
 | M4 | Private leagues paid in testnet Pi | |
 | M5 | Hackathon submission | |
 

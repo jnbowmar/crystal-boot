@@ -122,7 +122,7 @@ describe('M2 proof: the 9/20 matches settle and score correctly', async () => {
   const first = await sync(db, friday, fetcherFor({ 'en.1': feedAsOf('en.1', '2026-09-18'), 'es.1': feedAsOf('es.1', '2026-09-18') }), LEAGUE_IDS)
 
   // Everyone picks every match from Friday to Sunday: half two-tap, half exact.
-  const { body: upcoming } = await call(friday, 'GET', '/matches?from=2026-09-18&to=2026-09-20')
+  const { body: upcoming } = await call(friday, 'GET', '/api/matches?from=2026-09-18&to=2026-09-20')
   const made = new Map<string, Probs>() // `${user}|${matchId}`
   for (const user of users) {
     for (const m of upcoming.matches) {
@@ -137,7 +137,7 @@ describe('M2 proof: the 9/20 matches settle and score correctly', async () => {
         body = { matchId: m.id, pick }
         made.set(`${user}|${m.id}`, pick)
       }
-      const res = await call(friday, 'POST', '/picks', { user, body })
+      const res = await call(friday, 'POST', '/api/picks', { user, body })
       expect(res.status).toBe(200)
     }
   }
@@ -197,7 +197,7 @@ describe('M2 proof: the 9/20 matches settle and score correctly', async () => {
   })
 
   it('ranks the week the way leaderboard() does', async () => {
-    const { status, body } = await call(tuesday, 'GET', '/leaderboard?period=week&date=2026-09-20')
+    const { status, body } = await call(tuesday, 'GET', '/api/leaderboard?period=week&date=2026-09-20')
     expect(status).toBe(200)
     expect(body.from).toBe('2026-09-15T00:00:00.000Z')
     expect(body.minPicks).toBe(MIN_PICKS.week)
@@ -213,8 +213,19 @@ describe('M2 proof: the 9/20 matches settle and score correctly', async () => {
     expect(body.standings).toHaveLength(12)
   })
 
+  it("includes the caller's own line, ranked or not", async () => {
+    const ranked = await call(tuesday, 'GET', '/api/leaderboard?period=week&date=2026-09-20', { user: 'fan_1' })
+    expect(ranked.body.me).toEqual(ranked.body.standings.find((s: { userId: string }) => s.userId === 'fake:fan_1'))
+    const season = await call(tuesday, 'GET', '/api/leaderboard?period=season', { user: 'fan_1' })
+    expect(season.body.me).toMatchObject({ rank: null, userId: 'fake:fan_1', picks: 20 })
+    expect(season.body.standings).toEqual([]) // nobody has 50 yet
+    const newcomer = await call(tuesday, 'GET', '/api/leaderboard?period=week&date=2026-09-20', { user: 'newbie' })
+    expect(newcomer.body.me).toEqual({ rank: null, userId: 'fake:newbie', picks: 0, avgPoints: null })
+    expect((await call(tuesday, 'GET', '/api/leaderboard')).body.me).toBeNull()
+  })
+
   it('shows a player their scored picks', async () => {
-    const { body } = await call(tuesday, 'GET', '/picks', { user: 'fan_1' })
+    const { body } = await call(tuesday, 'GET', '/api/picks', { user: 'fan_1' })
     expect(body.picks).toHaveLength(truth.length)
     for (const p of body.picks) {
       expect(p.status).toBe('settled')
@@ -238,10 +249,10 @@ describe('pick locking', () => {
     const kickoff = at('2026-09-20T13:00:00Z')
     const pick = { matchId: id, pick: { H: 20, D: 25, A: 55 } }
 
-    expect((await call(kickoff - 1, 'POST', '/picks', { user: 'late_fan', body: pick })).status).toBe(200)
-    const locked = await call(kickoff, 'POST', '/picks', { user: 'late_fan', body: { ...pick, pick: { H: 0, D: 0, A: 100 } } })
+    expect((await call(kickoff - 1, 'POST', '/api/picks', { user: 'late_fan', body: pick })).status).toBe(200)
+    const locked = await call(kickoff, 'POST', '/api/picks', { user: 'late_fan', body: { ...pick, pick: { H: 0, D: 0, A: 100 } } })
     expect(locked).toEqual({ status: 409, body: { error: 'picks are locked for this match' } })
-    const { body } = await call(kickoff, 'GET', '/picks', { user: 'late_fan' })
+    const { body } = await call(kickoff, 'GET', '/api/picks', { user: 'late_fan' })
     expect(body.picks[0].pick).toEqual({ H: 20, D: 25, A: 55 })
     expect(body.picks[0].locked).toBe(true)
   })
@@ -252,7 +263,7 @@ describe('pick locking', () => {
     await sync(db, now, fetcherFor({ 'en.1': feedAsOf('en.1', '2026-09-18') }), ['en.1'])
     const id = matchId('en.1', '2026-27', 'AFC Bournemouth', 'Liverpool FC')
     const post = (body: unknown, user: string | null = 'fan') =>
-      call(now, 'POST', '/picks', { user: user ?? undefined, body })
+      call(now, 'POST', '/api/picks', { user: user ?? undefined, body })
     expect((await post({ matchId: id, pick: { H: 50, D: 50, A: 1 } })).status).toBe(400)
     expect((await post({ matchId: id, pick: { H: 50.5, D: 49.5, A: 0 } })).status).toBe(400)
     expect((await post({ matchId: id, outcome: 'X', confidence: 'lock' })).status).toBe(400)
@@ -265,7 +276,7 @@ describe('pick locking', () => {
   it('ignores X-Fake-User unless FAKE_USERS is on', async () => {
     const db = testDb()
     const res = await handle(
-      new Request('https://api.test/picks', { headers: { 'x-fake-user': 'fan' } }),
+      new Request('https://api.test/api/picks', { headers: { 'x-fake-user': 'fan' } }),
       { DB: db },
       Date.now(),
       fetch,
@@ -284,20 +295,20 @@ describe('feed changes after picks', () => {
     const { db, call } = setup()
     const t0 = at('2026-09-18T09:00:00Z')
     await sync(db, t0, fetcherFor({ 'en.1': only({}) }), ['en.1'])
-    await call(t0, 'POST', '/picks', { user: 'fan', body: { matchId: id, outcome: 'A', confidence: 'likely' } })
+    await call(t0, 'POST', '/api/picks', { user: 'fan', body: { matchId: id, outcome: 'A', confidence: 'likely' } })
     // Postponed to Wednesday 19:30.
     await sync(db, t0 + 1, fetcherFor({ 'en.1': only({ date: '2026-09-23', time: '19:30' }) }), ['en.1'])
     const sunday = at('2026-09-20T15:00:00Z')
-    const { body } = await call(sunday, 'GET', '/picks', { user: 'fan' })
+    const { body } = await call(sunday, 'GET', '/api/picks', { user: 'fan' })
     expect(body.picks[0]).toMatchObject({ date: '2026-09-23', kickoffAt: '2026-09-23T18:30:00.000Z', locked: false })
-    expect((await call(sunday, 'POST', '/picks', { user: 'fan', body: { matchId: id, outcome: 'D', confidence: 'lean' } })).status).toBe(200)
+    expect((await call(sunday, 'POST', '/api/picks', { user: 'fan', body: { matchId: id, outcome: 'D', confidence: 'lean' } })).status).toBe(200)
   })
 
   it('re-scores when the feed corrects a result, and not otherwise', async () => {
     const { db, call } = setup()
     const t0 = at('2026-09-18T09:00:00Z')
     await sync(db, t0, fetcherFor({ 'en.1': only({}) }), ['en.1'])
-    await call(t0, 'POST', '/picks', { user: 'fan', body: { matchId: id, pick: { H: 10, D: 20, A: 70 } } })
+    await call(t0, 'POST', '/api/picks', { user: 'fan', body: { matchId: id, pick: { H: 10, D: 20, A: 70 } } })
     const t1 = at('2026-09-22T00:00:00Z')
     expect((await sync(db, t1, fetcherFor({ 'en.1': only({ score: [0, 1] }) }), ['en.1'])).settled).toBe(1)
     const pts = () => (db.sqlite.prepare('SELECT points FROM picks').get() as { points: number }).points
@@ -316,7 +327,7 @@ describe('feed changes after picks', () => {
     const { db, call } = setup()
     const t0 = at('2026-09-18T09:00:00Z')
     await sync(db, t0, fetcherFor({ 'en.1': only({}) }), ['en.1'])
-    await call(t0, 'POST', '/picks', { user: 'fan', body: { matchId: id, pick: { H: 10, D: 20, A: 70 } } })
+    await call(t0, 'POST', '/api/picks', { user: 'fan', body: { matchId: id, pick: { H: 10, D: 20, A: 70 } } })
     const kickoff = at('2026-09-20T13:00:00Z')
     expect((await settle(db, kickoff + VOID_AFTER_MS)).voided).toBe(0)
     expect((await settle(db, kickoff + VOID_AFTER_MS + 1)).voided).toBe(1)
@@ -331,13 +342,13 @@ describe('feed changes after picks', () => {
     const { db, call } = setup()
     const t0 = at('2026-09-18T09:00:00Z')
     await sync(db, t0, fetcherFor({ 'en.1': only({}) }), ['en.1'])
-    await call(t0, 'POST', '/picks', { user: 'fan', body: { matchId: id, pick: { H: 10, D: 20, A: 70 } } })
-    const early = await call(t0, 'POST', '/admin/score', { admin: true, body: { matchId: id, home: 2, away: 0 } })
+    await call(t0, 'POST', '/api/picks', { user: 'fan', body: { matchId: id, pick: { H: 10, D: 20, A: 70 } } })
+    const early = await call(t0, 'POST', '/api/admin/score', { admin: true, body: { matchId: id, home: 2, away: 0 } })
     expect(early).toEqual({ status: 409, body: { error: 'match has not kicked off' } })
     const t1 = at('2026-09-21T00:00:00Z')
-    expect((await call(t1, 'POST', '/admin/score', { body: { matchId: id, home: 2, away: 0 } })).status).toBe(401)
-    expect((await call(t1, 'POST', '/admin/score', { admin: true, body: { matchId: 'nope', home: 2, away: 0 } })).status).toBe(404)
-    const res = await call(t1, 'POST', '/admin/score', { admin: true, body: { matchId: id, home: 2, away: 0 } })
+    expect((await call(t1, 'POST', '/api/admin/score', { body: { matchId: id, home: 2, away: 0 } })).status).toBe(401)
+    expect((await call(t1, 'POST', '/api/admin/score', { admin: true, body: { matchId: 'nope', home: 2, away: 0 } })).status).toBe(404)
+    const res = await call(t1, 'POST', '/api/admin/score', { admin: true, body: { matchId: id, home: 2, away: 0 } })
     expect(res).toEqual({ status: 200, body: { settled: 1, voided: 0 } })
     await sync(db, t1 + 1, fetcherFor({ 'en.1': only({ score: [0, 1] }) }), ['en.1'])
     expect(db.sqlite.prepare('SELECT home_goals, away_goals, score_source, result FROM matches').get()).toEqual({

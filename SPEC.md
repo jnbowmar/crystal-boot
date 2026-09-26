@@ -108,7 +108,7 @@ Cloudflare Worker (API)
 | M0 | ~~Data spike~~ **DONE 2026-09-23**, see "M0 results" below | `m0/base_rates.py` |
 | M1 | ~~`scoring.ts` + tests~~ **DONE 2026-09-23**: `src/scoring/scoring.ts`, 21 vitest tests incl. 693-case parity with `fed_calls/score.py` (`npm test`, `npm run parity`) | green tests, including a worked example |
 | M2 | ~~Worker + D1 + cron settlement, no auth (fake users)~~ **DONE 2026-09-26**, see "M2 results" below. Runs locally; deploying needs a Cloudflare account | matches from 9/20 settle and score correctly |
-| M3 | React pick flow at 375px + Pi auth in the Pi Browser sandbox | James makes real picks for next weekend's EPL |
+| M3 | React pick flow at 375px + Pi auth in the Pi Browser sandbox. **Built 2026-09-26**, see "M3 results"; the proof needs a deploy and the Pi sandbox | James makes real picks for next weekend's EPL (10/10 at the earliest) |
 | M4 | Private leagues + testnet Pi payment for creating one | full approve→sign→complete loop, cancel handled |
 | M5 | #PiHackathon entry: video, README, public repo (MIT, decided 2026-09-23) | submitted by the last day of the month |
 
@@ -146,12 +146,27 @@ These replace the 45/27/28 placeholder. The confidence-level split uses the leag
 
 **Found in the feed:** every bare `score: [h, a]` in 2026-27 (5 EPL, 5 La Liga) is a 0-0 with no half-time score. **No EPL matches between 9/20 and 10/10**, so M3's "next weekend's EPL" is 10/10 at the earliest (La Liga plays in between).
 
+## M3 results (2026-09-26)
+
+The app is in `web/` (Vite + React 19); Pi sign-in is in `src/worker/auth.ts`, with a `sessions` table in `migrations/0002_sessions.sql`. The Worker serves the built app as static files, with `/api/*` going to the Worker, so the app and API share one origin and one deploy.
+
+- **Checked:** `web/src/App.test.tsx` renders the real app against the real Worker handler and SQL, with only Pi stubbed. It covers sign-in, a two-tap pick whose preview and stored value match `quickPick`/`points`, an exact pick, the lock error at kickoff, and an expired session going back to sign-in. I also walked through it in Chromium at 375×812 against `wrangler dev` and the live feed, with no horizontal scroll.
+- **Not checked:** real Pi sign-in. `sdk.minepi.com` is blocked from the build environment, so the SDK wrapper (`web/src/pi.ts`) follows the pi-platform-docs reference but hasn't run against Pi yet. That's what the M3 proof is for.
+
+**Decisions made in M3:**
+- **Only the `username` scope for now.** `payments` gets added in M4, when there's a backend to complete payments. Adding it means users have to consent again.
+- **Our own session token after one `/v2/me` check,** valid for 30 days, rather than calling Pi on every request. Only its SHA-256 is stored. A bad or expired session is a 401 on every route, and the app goes back to sign-in.
+- **User IDs are `pi:<uid>`.** Usernames aren't unique in the table, and they update on each sign-in. I edited `0001_init.sql` to drop that constraint; it's safe because nothing has been deployed yet.
+- **Pick screen:** quick mode gives the chosen outcome the confidence level and splits the rest by the league's base rates. Exact mode has three linked sliders that keep the other two in proportion. Both show the points you'd get for each result before you save.
+- **No external links** in the app (listing rule), and the palette is pitch green and ice (no Pi purple or gold).
+- **`FAKE_USERS` and `PI_SANDBOX` are Worker vars read by the app at runtime** (`GET /api/config`), so one build works for dev, sandbox and mainnet. **Set `FAKE_USERS` to "0" before mainnet.**
+
 ## Open questions
 
 1. ~~Pi's developer terms on prediction/sports apps.~~ **CHECKED 2026-09-23: allowed as designed.** No rule bans sports or forecasting apps. The one hard rule is in the App Studio Community Guidelines: no "offering or facilitating gambling, betting, or lottery-related services involving Pi tokens, either directly or indirectly." The Developer Terms (2023-01-09) and the main ToS (2025-02-19) say nothing about gambling. Our design has Pi in only for non-outcome extras and never out on results, so it clears the rule. "Indirectly" means never adding performance-linked Pi tips, rewards or prizes later either. Other rules that apply:
    - **Don't talk about Pi's value.** The guidelines ban "material discussions, representations or misrepresentations regarding the value or valuation of Pi." So there are **no USD prices anywhere in the app**, and prices are in Pi only.
    - **Mainnet listing requirements:** the developer must be KYC'd; **Pi login only** (no email or other sign-in); **Pi-only transactions** (a Nimiq/USDT version has to be a separate deployment); **no external redirects** (fetch openfootball server-side, no links out to match sites); minimal data; **the domain can't start with "pi"** and can't use Pi's logo or colors.
-2. Does `Pi.authenticate` expose country? If not, users choose it themselves (and could lie about it; fine for v1).
+2. ~~Does `Pi.authenticate` expose country?~~ **CHECKED 2026-09-26: no.** `/v2/me` returns only `uid`, `username` (with the `username` scope) and the granted scopes. Country will be self-chosen when country leaderboards land. Also, `uid` is specific to each app and **changes if the user revokes the app's permissions**, which makes them a new player.
 3. ~~The openfootball timezone question.~~ **Settled in M0** (see above).
 4. ~~Name.~~ **Crystal Boot, screened 2026-09-23 (not legal clearance):** USPTO: no live or dead mark for CRYSTAL BOOT or CRYSTALBOOT (relevance-ranked search surfaced only single-word BOOT/CRYSTAL marks). App Store: no app by that name. Web: no football product, just crystal trophies. crystalboot.com is registered (GoDaddy, to 2028) to a dead Shopify store; **crystalboot.app and crystalbootfc.com are open**. YouTube @crystalboot and TikTok @crystalboot are taken by unrelated people; **@crystalbootfc is free on YouTube, TikTok and GitHub** (X and Instagram hide behind a login, so check those by hand). Pundit FC was rejected: a football prediction app called "PunditFC" already exists, plus Pundit (punditapp.uk) and The Pundit.
 5. Does a free league with Pi-paid extras need a Nimiq version at all, or is that just scope creep? Decide after M5.
