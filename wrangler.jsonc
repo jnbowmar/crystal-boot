@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "crystal-boot",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  // The React app (npm run build → web/dist). /api/* goes to the Worker.
+  "assets": {
+    "directory": "web/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "crystal-boot",
+      // Replace with the id from `npx wrangler d1 create crystal-boot` before deploying.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Every 6 hours: pull openfootball, settle finished matches, score picks.
+  "triggers": { "crons": ["0 */6 * * *"] },
+  // FAKE_USERS=1 allows X-Fake-User test players: dev and testnet only, set
+  // it to "0" for mainnet. PI_SANDBOX=1 runs the Pi SDK against the sandbox.
+  // Payments must be on PI_NETWORK ("Pi Network" for mainnet), and need the
+  // PI_API_KEY secret (`npx wrangler secret put PI_API_KEY`).
+  "vars": {
+    "FAKE_USERS": "1",
+    "PI_SANDBOX": "1",
+    "PI_NETWORK": "Pi Testnet",
+    "LEAGUE_PRICE_PI": "0.5"
+  },
+  "observability": { "enabled": true }
+}
