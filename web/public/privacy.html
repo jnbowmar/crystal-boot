@@ -1,0 +1,57 @@
+<!doctype html>
+<!-- DRAFT for review before launch: check the retention and deletion promises below. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0d2b22" />
+    <title>Privacy · Crystal Boot</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+      body { margin: 0; background: #0b231c; color: #eaf7f2; line-height: 1.55; }
+      main { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; }
+      h1 { color: #8fe3f2; font-size: 26px; margin: 8px 0 4px; }
+      h2 { font-size: 18px; margin: 28px 0 8px; }
+      p, li { color: #d5ebe4; }
+      .muted { color: #9dbdb2; font-size: 14px; }
+      a { color: #8fe3f2; }
+      ul { padding-left: 20px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p><a href="/">← Back to Crystal Boot</a></p>
+      <h1>Privacy</h1>
+      <p class="muted">Last updated 26 September 2026</p>
+
+      <p>Crystal Boot is a free football forecasting game. It keeps only what it needs to run the game.</p>
+
+      <h2>What we store</h2>
+      <ul>
+        <li><b>Your Pi identity:</b> the user id Pi gives this app (it's specific to Crystal Boot) and your Pi username, from Pi sign-in.</li>
+        <li><b>Your picks:</b> the percentages you gave for each match, when you made them, and the points they scored.</li>
+        <li><b>Your leagues:</b> the private leagues you started or joined, and their names.</li>
+        <li><b>Payments:</b> for anything you buy with Pi, the order, the amount, and the Pi payment and transaction ids, so we can prove the purchase and deliver it.</li>
+        <li><b>Sign-in sessions:</b> a scrambled (hashed) copy of your session token, which expires after 30 days. Your phone keeps the token itself.</li>
+      </ul>
+
+      <h2>What we don't store</h2>
+      <ul>
+        <li>No email address, phone number, wallet address or real name.</li>
+        <li>No location, contacts or device details.</li>
+        <li>No ads, no ad trackers, no analytics cookies.</li>
+      </ul>
+
+      <h2>Who can see it</h2>
+      <p>Your username and scores appear on leaderboards and in the private leagues you're in. Your individual picks are shown only to you. Once a match is settled, the app shows the crowd's average forecast for it, which doesn't identify anyone.</p>
+      <p>The app runs on Cloudflare, which processes requests to deliver the service. Payments go through Pi Network's payment system. We don't sell or share your data with anyone else.</p>
+
+      <h2>Deleting your data</h2>
+      <p>Ask us through the Crystal Boot project on GitHub (jnbowmar/crystal-boot) and we'll delete your account, picks and league memberships. We may keep payment records where we need them for accounting.</p>
+
+      <h2>Football data</h2>
+      <p>Fixtures and results come from openfootball, which is public domain. The app shows team names only.</p>
+    </main>
+  </body>
+</html>

@@ -13,6 +13,9 @@ export function Table({
   scope?: string
 }) {
   const [period, setPeriod] = useState<'week' | 'season'>('week')
+  // Weeks with no matches (international breaks) have an empty table, so the
+  // first load falls back to the season. Tapping a period switches this off.
+  const [autoSeason, setAutoSeason] = useState(true)
   const [league, setLeague] = useState<League | 'all'>('all')
   const [board, setBoard] = useState<Leaderboard | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -22,7 +25,15 @@ export function Table({
     setBoard(null)
     setError(null)
     api.leaderboard(period, league, scope).then(
-      (b) => live && setBoard(b),
+      (b) => {
+        if (!live) return
+        if (autoSeason && period === 'week' && b.standings.length === 0 && !b.me?.picks) {
+          setAutoSeason(false)
+          setPeriod('season')
+          return
+        }
+        setBoard(b)
+      },
       (e) => {
         if (live && !onUnauthorized(e)) setError(e instanceof Error ? e.message : String(e))
       },
@@ -30,17 +41,29 @@ export function Table({
     return () => {
       live = false
     }
-  }, [api, period, league, scope, onUnauthorized])
+  }, [api, period, league, scope, onUnauthorized, autoSeason])
 
   const me = board?.me
 
   return (
     <section>
       <div className="segmented" role="group" aria-label="Period">
-        <button aria-pressed={period === 'week'} onClick={() => setPeriod('week')}>
+        <button
+          aria-pressed={period === 'week'}
+          onClick={() => {
+            setAutoSeason(false)
+            setPeriod('week')
+          }}
+        >
           This week
         </button>
-        <button aria-pressed={period === 'season'} onClick={() => setPeriod('season')}>
+        <button
+          aria-pressed={period === 'season'}
+          onClick={() => {
+            setAutoSeason(false)
+            setPeriod('season')
+          }}
+        >
           Season
         </button>
       </div>

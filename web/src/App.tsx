@@ -243,5 +243,9 @@ function Logo({ small = false }: { small?: boolean }) {
 }
 
 function Disclaimer() {
-  return <p className="disclaimer">Free to play. No wagering. Scores are for bragging rights.</p>
+  return (
+    <p className="disclaimer">
+      Free to play. No wagering. Scores are for bragging rights. <a href="/privacy.html">Privacy</a>
+    </p>
+  )
 }

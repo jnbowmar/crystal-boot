@@ -76,7 +76,8 @@ describe('the app', () => {
     // opener, the only other match inside the three-week window.
     expect(screen.getAllByRole('button', { name: /Make your pick/ })).toHaveLength(21)
     expect(screen.getByText(/October 9/)).toBeTruthy()
-    expect(screen.getByText('Free to play. No wagering. Scores are for bragging rights.')).toBeTruthy()
+    expect(screen.getByText(/^Free to play\. No wagering\. Scores are for bragging rights\./)).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Privacy' }).getAttribute('href')).toBe('/privacy.html')
     // The session is kept, so a reload doesn't need Pi again.
     expect(localStorage.getItem('crystal-boot.session')).toBeTruthy()
   })
@@ -144,6 +145,19 @@ describe('the app', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('Your session ended. Sign in again.')
     expect(screen.getByRole('button', { name: 'Sign in with Pi' })).toBeTruthy()
     expect(localStorage.getItem('crystal-boot.session')).toBeNull()
+  })
+
+  it('opens the table on the season when this week has no scores', async () => {
+    await signedIn()
+    vi.setSystemTime(Date.parse('2026-09-26T12:00:00Z')) // international break
+    fireEvent.click(await screen.findByRole('button', { name: 'Table' }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Season' }).getAttribute('aria-pressed')).toBe('true'),
+    )
+    // Choosing the week yourself sticks, even though it's empty.
+    fireEvent.click(screen.getByRole('button', { name: 'This week' }))
+    expect(await screen.findByText(/Nobody has 10 scored picks this week/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'This week' }).getAttribute('aria-pressed')).toBe('true')
   })
 
   it('shows why Pi sign-in failed', async () => {

@@ -110,7 +110,7 @@ Cloudflare Worker (API)
 | M2 | ~~Worker + D1 + cron settlement, no auth (fake users)~~ **DONE 2026-09-26**, see "M2 results" below. Runs locally; deploying needs a Cloudflare account | matches from 9/20 settle and score correctly |
 | M3 | React pick flow at 375px + Pi auth in the Pi Browser sandbox. **Built 2026-09-26**, see "M3 results"; the proof needs a deploy and the Pi sandbox | James makes real picks for next weekend's EPL (10/10 at the earliest) |
 | M4 | Private leagues + testnet Pi payment for creating one. **Built 2026-09-26**, see "M4 results"; the real-Pi run needs the sandbox | full approve→sign→complete loop, cancel handled |
-| M5 | #PiHackathon entry: video, README, public repo (MIT, decided 2026-09-23) | submitted by the last day of the month |
+| M5 | #PiHackathon entry: video, README, public repo (MIT, decided 2026-09-23). **In progress 2026-09-26**, checklist in `docs/SUBMISSION.md` | submitted by the last day of the month |
 
 ## M0 results (2026-09-23)
 
@@ -180,6 +180,19 @@ Private leagues are in `src/worker/leagues.ts`, payments in `src/worker/payments
 - **Pi sign-in now asks for `payments` as well as `username`**, so players approve once more. Before paying, the app runs `Pi.authenticate` again, because Pi needs it in the same page load as `createPayment`. That's also when an unfinished payment gets reported.
 - **Test players can join leagues but can't pay.** With no `PI_API_KEY` set, the server refuses orders (503), and the app says payments aren't switched on.
 - **League rules:** names are 3-40 characters. Invite codes are 8 characters from an alphabet without 0/O/1/I, and typing them is forgiving about case, spaces and dashes. There are at most 500 players per league (enforced inside the insert). The creator can't leave. League tables are members only.
+
+## M5 progress (2026-09-26)
+
+- **Entry requirements** (from Pi's hackathon pages, via search; minepi.com is blocked from the build environment): a Testnet or Mainnet demo app link, a public video of 3 minutes or less, and a description, submitted in Brainstorm.
+- **Done:**
+  - The repo was already public (since 9/24).
+  - The README now has screenshots, a "How it uses Pi" section and demo-data instructions.
+  - `docs/SUBMISSION.md` has the checklist, the Brainstorm description and a shot list for the sandbox video.
+  - There's a draft privacy page (`web/public/privacy.html`), linked from the app footer.
+  - `npm run demo:seed` fills a local database with made-up players on the real results. They're tuned to average 68-74 points, which is where real forecasters land.
+  - A captioned 1:21 local walkthrough video is recorded (not committed).
+- **App change:** the Table and league tables now open on Season when the current week has no scores (international breaks), instead of an empty week.
+- **Left, all needing James or real Pi:** deploy, the M3 and M4 sandbox proofs, `FAKE_USERS=0` for the demo deploy, a price check, a privacy review, the real sandbox video, and the Brainstorm submission.
 
 ## Open questions
 

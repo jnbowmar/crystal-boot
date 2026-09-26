@@ -732,6 +732,11 @@ button.card:active {
   margin: 8px 0 0;
 }
 
+.disclaimer a {
+  color: var(--muted);
+  margin-left: 4px;
+}
+
 .disclaimer {
   margin: 24px 0 8px;
   font-size: 13px;

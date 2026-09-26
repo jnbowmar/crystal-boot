@@ -2,11 +2,28 @@
 
 [![test](https://github.com/jnbowmar/crystal-boot/actions/workflows/test.yml/badge.svg)](https://github.com/jnbowmar/crystal-boot/actions/workflows/test.yml)
 
-A free football forecasting league for the Pi Browser. For each match you give a probability for a home win, a draw and an away win. After full time you're scored on how close you were, and you climb leaderboards against the crowd, your country and your friends.
+A free football forecasting league for the Pi Browser. For each Premier League and La Liga match you give a probability for a home win, a draw and an away win. After full time you're scored on how close you were. You can see whether you beat the crowd, and climb the global table and private leagues with your friends.
 
-It's free to play and there's no wagering. Pi pays only for extras that have nothing to do with results, like creating a private league or a season stats pack. Pi never pays out on a match.
+It's free to play and there's no wagering. Pi pays only for extras that have nothing to do with results. Today that's creating a private league. Pi never pays out on a match.
 
 Built for the monthly #PiHackathon, targeting November 2026. The full design is in [SPEC.md](SPEC.md).
+
+<p>
+  <img src="docs/screenshots/1-matches.png" width="19%" alt="Fixtures with kickoff times in your timezone">
+  <img src="docs/screenshots/2-pick.png" width="19%" alt="Two-tap pick with the points each result would score">
+  <img src="docs/screenshots/3-my-picks.png" width="19%" alt="Scored picks, average points and beating the crowd">
+  <img src="docs/screenshots/4-table.png" width="19%" alt="Season leaderboard by average points">
+  <img src="docs/screenshots/5-league.png" width="19%" alt="A private league with its invite code and table">
+</p>
+
+<sub>Screenshots from a local build with made-up demo players (`npm run demo:seed`) on real 2026-27 fixtures and results.</sub>
+
+## How it uses Pi
+
+- **Pi sign-in only.** Players are verified Pi users, so one person gets one account, which is the usual way prediction games get cheated. The server checks every sign-in against Pi's `/v2/me`.
+- **Pi payments for extras, never for outcomes.** Starting a private league is a one-off user-to-app payment. Pi goes in only for things unrelated to how a match turns out, and nothing is ever paid out on results. This follows the Pi App Studio rule against "gambling, betting, or lottery-related services involving Pi tokens, either directly or indirectly".
+- **Built for Pi's rules:** prices are in Pi only (no dollar values anywhere), there are no links out of the app, no email or other sign-in, and minimal data (Pi uid and username, picks and leagues).
+- **Built for Pi's audience:** football is the biggest sport in Nigeria, Vietnam, the Philippines, Indonesia and India. The app is designed for a 375px phone, shows kickoff times in your own timezone, and needs only two taps per pick.
 
 ## How scoring works
 
@@ -45,7 +62,7 @@ Reproduce with `python3 m0/base_rates.py`.
 
 A React app (Vite + TypeScript) in [`web/`](web/), built for a 375px phone screen in the Pi Browser. You make a pick in two taps: choose Home, Draw or Away, then how sure you are. There's also an exact-percentage mode with three linked sliders. Before you save, it shows how many points you'd get for each result. Kickoff times show in your own timezone. It imports the same `scoring.ts` as the Worker, so its preview can't disagree with how a pick is actually scored.
 
-Sign-in is Pi only. The app calls `Pi.authenticate(['username'])` and sends the access token to `POST /api/auth`. The Worker checks it against Pi's `/v2/me`, which is the source of truth, and returns its own 30-day session token. Only a SHA-256 hash of that token is stored.
+Sign-in is Pi only. The app calls `Pi.authenticate(['username', 'payments'])` and sends the access token to `POST /api/auth`. The Worker checks it against Pi's `/v2/me`, which is the source of truth, and returns its own 30-day session token. Only a SHA-256 hash of that token is stored.
 
 ## Private leagues and Pi payments
 
@@ -89,6 +106,8 @@ curl -X POST "localhost:8787/cdn-cgi/handler/scheduled?cron=0+*/6+*+*+*"   # run
 
 For live reload while working on the app, also run `npm run dev:web` (Vite on :5173, proxying `/api` to :8787).
 
+To fill a local database with made-up players, picks on the real results so far and a private league (for demos and screenshots), run `npm run demo:seed` after the first cron run. It's for the local database only.
+
 To deploy: `npx wrangler d1 create crystal-boot`, put the id in `wrangler.jsonc`, then `npm run db:migrate:remote`, `npx wrangler secret put ADMIN_TOKEN`, `npx wrangler secret put PI_API_KEY` (from the Pi Developer Portal) and `npm run deploy`. To try it in the Pi sandbox, open `develop.pi` in the Pi Browser, register the app, set its development URL to the deployed Worker, and open the sandbox URL the portal gives you (see [Pi's docs](https://github.com/pi-apps/pi-platform-docs)).
 
 ## Run the tests
@@ -115,7 +134,7 @@ The suite also includes a 693-case parity check against the Python Brier functio
 | M2 | Cloudflare Worker, D1 database, scheduled settlement | done (runs locally; not deployed yet) |
 | M3 | React pick flow and Pi sign-in in the Pi Browser | built; waiting on a Pi sandbox test |
 | M4 | Private leagues paid in testnet Pi | built; waiting on a Pi sandbox test |
-| M5 | Hackathon submission | |
+| M5 | Hackathon submission | in progress: see [docs/SUBMISSION.md](docs/SUBMISSION.md) |
 
 ## Data
 
