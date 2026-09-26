@@ -11,7 +11,7 @@ What a #PiHackathon entry needs, from Pi's hackathon pages (checked 26 September
 
 | | Item | State |
 |---|---|---|
-| ☐ | Deploy to Cloudflare (steps in the README): D1 database, migrations, `ADMIN_TOKEN` and `PI_API_KEY` secrets | not done |
+| ☑ | Deploy to Cloudflare (steps in the README): D1 database, migrations, `ADMIN_TOKEN` and `PI_API_KEY` secrets | deployed 26 Sept to https://crystal-boot.hrk9mk4w8y.workers.dev with `ADMIN_TOKEN`; `PI_API_KEY` waits on the Developer Portal |
 | ☐ | Register the app in the Pi Developer Portal (`develop.pi` in the Pi Browser), set the development URL to the deployed Worker | not done |
 | ☐ | M3 proof: sign in and make real picks in the Pi sandbox | not done |
 | ☐ | M4 proof: start a league with testnet Pi, and cancel one partway through | not done |

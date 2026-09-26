@@ -13,8 +13,7 @@
     {
       "binding": "DB",
       "database_name": "crystal-boot",
-      // Replace with the id from `npx wrangler d1 create crystal-boot` before deploying.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "7d6cc79f-6079-485a-92f4-ae11296ba417",
       "migrations_dir": "migrations"
     }
   ],
