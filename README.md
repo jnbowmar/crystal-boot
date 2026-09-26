@@ -123,7 +123,7 @@ The payment tests run the whole approve → sign → complete loop against `Fake
 
 The Worker tests run the real SQL and migrations on `node:sqlite`, against snapshots of the live 2026-27 feeds. They replay the weekend of 18-20 September: a dozen fake players pick all 20 matches, then the next sync settles them, and every pick's points, every crowd forecast and the weekly leaderboard must match `scoring.ts` exactly. Another test checks the SQL points formula against `points()` for every possible pick.
 
-The suite also includes a 693-case parity check against the Python Brier function I already use to score my own Fed forecasts. `scripts/parity.py` generated the fixture in `src/scoring/__fixtures__/`. It reads that private scorer, so the committed fixture is what CI checks against.
+The suite also includes a 693-case parity check against an independent Python Brier scorer that lives outside this repo. `scripts/parity.py` generated the fixture in `src/scoring/__fixtures__/` (point `BRIER_SCORER` at the scorer to regenerate it), and the committed fixture is what CI checks against.
 
 ## Status
 
