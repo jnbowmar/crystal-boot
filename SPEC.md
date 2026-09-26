@@ -107,7 +107,7 @@ Cloudflare Worker (API)
 |---|---|---|
 | M0 | ~~Data spike~~ **DONE 2026-09-23**, see "M0 results" below | `m0/base_rates.py` |
 | M1 | ~~`scoring.ts` + tests~~ **DONE 2026-09-23**: `src/scoring/scoring.ts`, 21 vitest tests incl. 693-case parity with `fed_calls/score.py` (`npm test`, `npm run parity`) | green tests, including a worked example |
-| M2 | Worker + D1 + cron settlement, no auth (fake users) | matches from 9/20 settle and score correctly |
+| M2 | ~~Worker + D1 + cron settlement, no auth (fake users)~~ **DONE 2026-09-26**, see "M2 results" below. Runs locally; deploying needs a Cloudflare account | matches from 9/20 settle and score correctly |
 | M3 | React pick flow at 375px + Pi auth in the Pi Browser sandbox | James makes real picks for next weekend's EPL |
 | M4 | Private leagues + testnet Pi payment for creating one | full approve→sign→complete loop, cancel handled |
 | M5 | #PiHackathon entry: video, README, public repo (MIT, decided 2026-09-23) | submitted by the last day of the month |
@@ -130,6 +130,21 @@ These replace the 45/27/28 placeholder. The confidence-level split uses the leag
 - **Score format changes by season.** Usually `score: {ft: [h, a]}`, but 2025-26 EPL uses a bare `score: [h, a]`. The parser handles both (`full_time()` in `m0/base_rates.py`); port it to TS.
 - **Gaps happen.** La Liga 2024-25 has only 370 of 380 results. Settlement must tolerate a match that never gets a score (admin override, or void after N days).
 - **2026-27 status on 9/23:** EPL 45 settled, La Liga 64, both through 2026-09-20. Enough live data for M2.
+
+## M2 results (2026-09-26)
+
+`src/worker/` + `migrations/0001_init.sql`. The proof is `src/worker/settle.test.ts`: it replays the real feeds (snapshotted 9/26) as of Friday 9/18. Twelve fake users pick all 20 matches from 9/18 to 9/20, half two-tap and half exact. A sync on Tuesday 9/22 then settles them, and every pick's points, each crowd forecast and the week's leaderboard match `scoring.ts` exactly. `wrangler dev` against the live feed synced 380 + 380 fixtures and settled 119 (50 EPL, 69 La Liga), which is everything through 9/20.
+
+**Decisions made in M2:**
+- **Match ID is `league|season|home|away`, not `league|date|home|away`.** Each ordered pair meets once per league season, so the ID survives a reschedule; with the date in it, a postponed match would become a new match and orphan its picks. When a match moves, the lock moves with it, and picks stay editable until the new kickoff.
+- **Void after 14 days without a result.** Voided picks don't count. If a score turns up later, the match settles normally.
+- **Score corrections re-settle** only when the result (H/D/A) changes, since points depend on nothing else. A score that disappears from the feed is kept.
+- **An admin score beats the feed for good** and can only be entered after kickoff.
+- **Weeks run Tuesday 00:00 to Tuesday 00:00 UTC**, so Monday night matches count with their weekend.
+- **Scoring runs in SQL** (`POINTS_SQL`), one statement per cron run, because D1 caps queries per invocation. A test checks it against `points()` on all 5,151 picks × 3 results.
+- **Timezones use `Intl`** (the runtime's tz database), not a date library. Tests cover the BST/CET changes.
+
+**Found in the feed:** every bare `score: [h, a]` in 2026-27 (5 EPL, 5 La Liga) is a 0-0 with no half-time score. **No EPL matches between 9/20 and 10/10**, so M3's "next weekend's EPL" is 10/10 at the earliest (La Liga plays in between).
 
 ## Open questions
 

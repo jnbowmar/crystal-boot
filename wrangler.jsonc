@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "crystal-boot",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "crystal-boot",
+      // Replace with the id from `npx wrangler d1 create crystal-boot` before deploying.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Every 6 hours: pull openfootball, settle finished matches, score picks.
+  "triggers": { "crons": ["0 */6 * * *"] },
+  // M2 only: X-Fake-User stands in for Pi auth. Turn off when M3 lands.
+  "vars": { "FAKE_USERS": "1" },
+  "observability": { "enabled": true }
+}

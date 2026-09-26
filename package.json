@@ -7,11 +7,16 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "parity": "python3 scripts/parity.py"
+    "parity": "python3 scripts/parity.py",
+    "dev": "wrangler dev --test-scheduled",
+    "db:migrate:local": "wrangler d1 migrations apply crystal-boot --local",
+    "db:migrate:remote": "wrangler d1 migrations apply crystal-boot --remote",
+    "deploy": "wrangler deploy"
   },
   "devDependencies": {
     "@types/node": "^24.13.6",
     "typescript": "~6.0.2",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.1",
+    "wrangler": "^4.141.0"
   }
 }

@@ -41,6 +41,31 @@ From five finished seasons (2021-22 to 2025-26) of [openfootball](https://github
 
 Reproduce with `python3 m0/base_rates.py`.
 
+## The backend
+
+A Cloudflare Worker with a D1 (SQLite) database, in [`src/worker/`](src/worker/). Every 6 hours a cron job pulls the openfootball feeds, upserts matches, settles the ones that have a score and scores their picks. Each step is a single SQL statement, so a run takes a handful of D1 queries however many picks there are.
+
+| Route | What |
+|---|---|
+| `GET /matches?league=en.1&from=&to=` | Fixtures with status, result, crowd forecast and your pick |
+| `POST /picks` | `{matchId, pick: {H, D, A}}` or two-tap `{matchId, outcome, confidence}`. Refused from kickoff on |
+| `GET /picks` | Your picks and points |
+| `GET /leaderboard?league=all&period=week\|season&date=` | Average points, minimum pick count applies |
+| `POST /admin/sync`, `POST /admin/score` | Run the cron now; enter a result by hand (bearer `ADMIN_TOKEN`) |
+
+Until Pi sign-in lands in M3 there's no auth: with `FAKE_USERS=1`, an `X-Fake-User: <name>` header is the player.
+
+Run it locally:
+
+```bash
+echo "ADMIN_TOKEN=dev-admin" > .dev.vars
+npm run db:migrate:local
+npm run dev                                   # http://localhost:8787
+curl "localhost:8787/__scheduled?cron=0+*/6+*+*+*"   # run the cron once
+```
+
+To deploy: `npx wrangler d1 create crystal-boot`, put the id in `wrangler.jsonc`, then `npm run db:migrate:remote`, `npx wrangler secret put ADMIN_TOKEN` and `npm run deploy`.
+
 ## Run the tests
 
 ```bash
@@ -48,7 +73,9 @@ npm install
 npm test
 ```
 
-The suite includes a 693-case parity check against the Python Brier function I already use to score my own Fed forecasts. `scripts/parity.py` generated the fixture in `src/scoring/__fixtures__/`. It reads that private scorer, so the committed fixture is what CI checks against.
+The Worker tests run the real SQL and migrations on `node:sqlite`, against snapshots of the live 2026-27 feeds. They replay the weekend of 18-20 September: a dozen fake players pick all 20 matches, then the next sync settles them, and every pick's points, every crowd forecast and the weekly leaderboard must match `scoring.ts` exactly. Another test checks the SQL points formula against `points()` for every possible pick.
+
+The suite also includes a 693-case parity check against the Python Brier function I already use to score my own Fed forecasts. `scripts/parity.py` generated the fixture in `src/scoring/__fixtures__/`. It reads that private scorer, so the committed fixture is what CI checks against.
 
 ## Status
 
@@ -56,8 +83,8 @@ The suite includes a 693-case parity check against the Python Brier function I a
 |---|---|---|
 | M0 | Base rates and kickoff timezones from openfootball | done |
 | M1 | Scoring module and tests | done |
-| M2 | Cloudflare Worker, D1 database, scheduled settlement | next |
-| M3 | React pick flow and Pi sign-in in the Pi Browser | |
+| M2 | Cloudflare Worker, D1 database, scheduled settlement | done (runs locally; not deployed yet) |
+| M3 | React pick flow and Pi sign-in in the Pi Browser | next |
 | M4 | Private leagues paid in testnet Pi | |
 | M5 | Hackathon submission | |
 
