@@ -1,6 +1,6 @@
 # Crystal Boot — spec
 
-**Name: Crystal Boot** (was working name Forecast League; screened 2026-09-23, see open question 4). Written 2026-09-23. **Not started; queued behind Nimiq Cycle III (submission Oct 30). Target: November build for the monthly #PiHackathon.**
+**Name: Crystal Boot** (was working name Forecast League; screened 2026-09-23, see open question 4). Written 2026-09-23. **Target: the November 2026 #PiHackathon.**
 
 ## One line
 
@@ -9,10 +9,10 @@ A free football forecasting game: for each match you say how likely a home win, 
 ## Why this one
 
 - **Audience fit.** Pi's user base is heavily Nigeria, Vietnam, the Philippines, Indonesia and India, all football-first. The club season runs Aug–May, so there are matches to forecast every week.
-- **It's your edge.** It's the same scoring as `~/Claude/fed_calls/score.py` (Brier), the same concepts as Foresight, and a live demo for *Prediction Markets for Regular People*.
+- **Proper scoring.** The Brier score is what professional forecasters are judged on, so the game rewards calibration rather than lucky streaks.
 - **Pi KYC is a feature.** Pi usernames belong to verified humans, so "one person, one account" (the usual cheat in prediction games) comes free.
-- **It's a real backend build:** auth, a database, scheduled settlement, payments. That's the developer-growth step up from Premium Scan.
-- **Portable.** One backend, with the Pi front end first and a Nimiq mini-app front end later if wanted.
+- **A real backend:** auth, a database, scheduled settlement and payments.
+- **Portable.** One backend, with the Pi front end first and other front ends later if wanted.
 
 ## The gambling line (non-negotiable)
 
@@ -79,14 +79,14 @@ https://raw.githubusercontent.com/openfootball/football.json/master/2026-27/en.1
 | Season stats pack | 3 Pi | Calibration chart ("when you say 80%, you're right 71%"), best/worst teams to call, streaks |
 | Profile badge / flair | 1 Pi | Status on leaderboards |
 
-**Price against mining, not dollars (2026-09-23).** Base mining is ~0.0023 Pi/hr = ~0.055 Pi/day = ~20 Pi/yr, so 5 Pi is ~90 days of a typical pioneer's mining. Re-price before M4 in the range of 0.5 Pi (league) / 0.3 Pi (stats pack) / 0.1 Pi (badge), and check current mining rates when M4 starts. Earned Pi is held, per James's long-horizon thesis; FMV at receipt is LLC ordinary income.
+**Price against mining, not dollars (2026-09-23).** Base mining is ~0.0023 Pi/hr = ~0.055 Pi/day = ~20 Pi/yr, so 5 Pi is ~90 days of a typical pioneer's mining. Re-price before M4 in the range of 0.5 Pi (league) / 0.3 Pi (stats pack) / 0.1 Pi (badge), and check current mining rates when M4 starts.
 
-Same flow as the Unlock Calendar: `Pi.createPayment` → Worker `/approve` → user signs → Worker `/complete` → unlock only after a 200. `onIncompletePaymentFound` resumes on next load. Testnet sandbox first.
+Pi's standard flow: `Pi.createPayment` → Worker `/approve` → user signs → Worker `/complete` → unlock only after a 200. `onIncompletePaymentFound` resumes on next load. Testnet sandbox first.
 
 ## Architecture
 
 ```
-Pi Browser ── React app (Vite + TS, Premium Scan stack)
+Pi Browser ── React app (Vite + TS)
    │  Pi.authenticate(['username','payments'])  → accessToken
    ▼
 Cloudflare Worker (API)
@@ -99,14 +99,14 @@ Cloudflare Worker (API)
 ```
 
 - **Storage:** Pi `uid` + username, picks and league membership. No email, no wallet address, and no ads SDK for v1. A privacy page goes up before launch.
-- **Scoring code:** a pure TS module (`scoring.ts`), unit-tested against a port of `fed_calls/score.py`'s `brier()` extended to three outcomes, the same parity-test pattern as Premium Scan.
+- **Scoring code:** a pure TS module (`scoring.ts`), unit-tested against an existing Python Brier scorer extended to three outcomes (a parity test).
 
 ## Milestones
 
 | # | What | Proof |
 |---|---|---|
 | M0 | ~~Data spike~~ **DONE 2026-09-23**, see "M0 results" below | `m0/base_rates.py` |
-| M1 | ~~`scoring.ts` + tests~~ **DONE 2026-09-23**: `src/scoring/scoring.ts`, 21 vitest tests incl. 693-case parity with `fed_calls/score.py` (`npm test`, `npm run parity`) | green tests, including a worked example |
+| M1 | ~~`scoring.ts` + tests~~ **DONE 2026-09-23**: `src/scoring/scoring.ts`, 21 vitest tests incl. 693-case parity with a Python Brier scorer (`npm test`, `npm run parity`) | green tests, including a worked example |
 | M2 | ~~Worker + D1 + cron settlement, no auth (fake users)~~ **DONE 2026-09-26**, see "M2 results" below. Runs locally; deploying needs a Cloudflare account | matches from 9/20 settle and score correctly |
 | M3 | React pick flow at 375px + Pi auth in the Pi Browser sandbox. **Built 2026-09-26**, see "M3 results"; the proof needs a deploy and the Pi sandbox | James makes real picks for next weekend's EPL (10/10 at the earliest) |
 | M4 | Private leagues + testnet Pi payment for creating one. **Built 2026-09-26**, see "M4 results"; the real-Pi run needs the sandbox | full approve→sign→complete loop, cancel handled |
@@ -198,11 +198,11 @@ Private leagues are in `src/worker/leagues.ts`, payments in `src/worker/payments
 
 1. ~~Pi's developer terms on prediction/sports apps.~~ **CHECKED 2026-09-23: allowed as designed.** No rule bans sports or forecasting apps. The one hard rule is in the App Studio Community Guidelines: no "offering or facilitating gambling, betting, or lottery-related services involving Pi tokens, either directly or indirectly." The Developer Terms (2023-01-09) and the main ToS (2025-02-19) say nothing about gambling. Our design has Pi in only for non-outcome extras and never out on results, so it clears the rule. "Indirectly" means never adding performance-linked Pi tips, rewards or prizes later either. Other rules that apply:
    - **Don't talk about Pi's value.** The guidelines ban "material discussions, representations or misrepresentations regarding the value or valuation of Pi." So there are **no USD prices anywhere in the app**, and prices are in Pi only.
-   - **Mainnet listing requirements:** the developer must be KYC'd; **Pi login only** (no email or other sign-in); **Pi-only transactions** (a Nimiq/USDT version has to be a separate deployment); **no external redirects** (fetch openfootball server-side, no links out to match sites); minimal data; **the domain can't start with "pi"** and can't use Pi's logo or colors.
+   - **Mainnet listing requirements:** the developer must be KYC'd; **Pi login only** (no email or other sign-in); **Pi-only transactions** (a version taking other currencies has to be a separate deployment); **no external redirects** (fetch openfootball server-side, no links out to match sites); minimal data; **the domain can't start with "pi"** and can't use Pi's logo or colors.
 2. ~~Does `Pi.authenticate` expose country?~~ **CHECKED 2026-09-26: no.** `/v2/me` returns only `uid`, `username` (with the `username` scope) and the granted scopes. Country will be self-chosen when country leaderboards land. Also, `uid` is specific to each app and **changes if the user revokes the app's permissions**, which makes them a new player.
 3. ~~The openfootball timezone question.~~ **Settled in M0** (see above).
 4. ~~Name.~~ **Crystal Boot, screened 2026-09-23 (not legal clearance):** USPTO: no live or dead mark for CRYSTAL BOOT or CRYSTALBOOT (relevance-ranked search surfaced only single-word BOOT/CRYSTAL marks). App Store: no app by that name. Web: no football product, just crystal trophies. crystalboot.com is registered (GoDaddy, to 2028) to a dead Shopify store; **crystalboot.app and crystalbootfc.com are open**. YouTube @crystalboot and TikTok @crystalboot are taken by unrelated people; **@crystalbootfc is free on YouTube, TikTok and GitHub** (X and Instagram hide behind a login, so check those by hand). Pundit FC was rejected: a football prediction app called "PunditFC" already exists, plus Pundit (punditapp.uk) and The Pundit.
-5. Does a free league with Pi-paid extras need a Nimiq version at all, or is that just scope creep? Decide after M5.
+5. Does the app need a version for another platform at all, or is that just scope creep? Decide after M5.
 
 ## Not doing
 
