@@ -22,7 +22,7 @@ import {
 
 const FIX = join(import.meta.dirname, '__fixtures__', 'brier.expected.json')
 
-describe('parity with fed_calls/score.py', () => {
+describe('parity with an independent Python Brier scorer', () => {
   const { cases } = JSON.parse(readFileSync(FIX, 'utf8')) as {
     cases: { pick: Probs; actual: Outcome; brier: number; points: number }[]
   }

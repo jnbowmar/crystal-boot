@@ -1,27 +1,33 @@
-"""Generate the Brier parity fixture from fed_calls/score.py.
+"""Generate the Brier parity fixture from an independent Python Brier scorer.
 
-fed_calls scores binary calls with brier(p, outcome) = (p - outcome)^2. The
-three-outcome version is that same function summed over home, draw and away.
-This script does exactly that, in exact fractions, for every pick on a 5%
-grid and every result, and writes the answers for vitest to check scoring.ts
-against.
+The scorer lives outside this repo and scores binary calls with
+brier(p, outcome) = (p - outcome)^2. The three-outcome version is that same
+function summed over home, draw and away. This script does exactly that, in
+exact fractions, for every pick on a 5% grid and every result, and writes the
+answers for vitest to check scoring.ts against.
 
-    python3 scripts/parity.py
+    BRIER_SCORER=/path/to/score.py python3 scripts/parity.py
+
+The scorer module must define brier(p, outcome). CI checks the committed
+fixture, so this only needs running when the fixture changes.
 """
 import importlib.util
 import json
 import math
 import os
+import sys
 from fractions import Fraction
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 OUT = os.path.join(ROOT, "src", "scoring", "__fixtures__", "brier.expected.json")
-SCORE = os.path.expanduser("~/Claude/fed_calls/score.py")
+SCORE = os.environ.get("BRIER_SCORER")
+if not SCORE or not os.path.isfile(os.path.expanduser(SCORE)):
+    sys.exit("Set BRIER_SCORER to the path of a Python file that defines brier(p, outcome).")
 
-spec = importlib.util.spec_from_file_location("fed_score", SCORE)
-fed = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(fed)
+spec = importlib.util.spec_from_file_location("brier_scorer", os.path.expanduser(SCORE))
+scorer = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(scorer)
 
 
 cases = []
@@ -29,7 +35,7 @@ for h in range(0, 101, 5):
     for d in range(0, 101 - h, 5):
         pick = {"H": h, "D": d, "A": 100 - h - d}
         for actual in "HDA":
-            b = sum(fed.brier(Fraction(pick[o], 100), 1 if o == actual else 0) for o in "HDA")
+            b = sum(scorer.brier(Fraction(pick[o], 100), 1 if o == actual else 0) for o in "HDA")
             raw = 100 - 50 * b
             # With whole percentages raw never ends in exactly .5 (scoring.ts
             # explains why), so plain round-half-up is unambiguous here.
@@ -39,5 +45,5 @@ for h in range(0, 101, 5):
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 with open(OUT, "w") as f:
-    json.dump({"source": "fed_calls/score.py brier(), summed over H/D/A", "cases": cases}, f)
+    json.dump({"source": "independent Python brier(), summed over H/D/A", "cases": cases}, f)
 print("%d cases -> %s" % (len(cases), os.path.relpath(OUT, ROOT)))
