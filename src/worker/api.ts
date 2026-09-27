@@ -335,6 +335,10 @@ export async function handle(req: Request, env: Env, now: number, fetcher: Fetch
   const route = `${req.method} ${url.pathname}`
   try {
     switch (route) {
+      case 'GET /validation-key.txt':
+        // Pi's Developer Portal checks this to verify the app's domain.
+        if (!env.PI_VALIDATION_KEY) return json({ error: 'not found' }, 404)
+        return new Response(env.PI_VALIDATION_KEY, { headers: { 'content-type': 'text/plain; charset=utf-8' } })
       case 'GET /api/health':
         return json({ ok: true, now: new Date(now).toISOString() })
       case 'GET /api/config':

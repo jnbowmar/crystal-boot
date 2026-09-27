@@ -14,6 +14,15 @@ function strictFetch(this: unknown, input: string) {
 }
 
 describe('Worker entry', () => {
+  it('serves the Pi domain validation key as plain text, or 404 when unset', async () => {
+    const get = (env: object) => worker.fetch(new Request('https://app.test/validation-key.txt'), { DB: testDb(), ...env })
+    const res = await get({ PI_VALIDATION_KEY: 'abc123' })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('text/plain; charset=utf-8')
+    expect(await res.text()).toBe('abc123')
+    expect((await get({})).status).toBe(404)
+  })
+
   it('the stand-in really rejects method-style calls', () => {
     expect(() => ({ f: strictFetch }).f('https://x/v2/me')).toThrow('Illegal invocation')
   })

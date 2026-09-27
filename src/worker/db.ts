@@ -28,6 +28,9 @@ export interface Env {
   PI_NETWORK?: string
   /** Price of creating a private league, in Pi. Defaults to 0.5. */
   LEAGUE_PRICE_PI?: string
+  /** Domain validation key from the Pi Developer Portal, served at
+   *  /validation-key.txt (secret, so it stays out of the public repo). */
+  PI_VALIDATION_KEY?: string
   /** Bearer token for /admin routes. Unset means /admin is off. */
   ADMIN_TOKEN?: string
 }
