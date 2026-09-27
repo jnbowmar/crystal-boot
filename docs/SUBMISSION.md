@@ -12,8 +12,8 @@ What a #PiHackathon entry needs, from Pi's hackathon pages (checked 26 September
 | | Item | State |
 |---|---|---|
 | ☑ | Deploy to Cloudflare (steps in the README): D1 database, migrations, `ADMIN_TOKEN` and `PI_API_KEY` secrets | deployed 26 Sept to https://crystal-boot.hrk9mk4w8y.workers.dev with `ADMIN_TOKEN`; `PI_API_KEY` waits on the Developer Portal |
-| ☐ | Register the app in the Pi Developer Portal (`develop.pi` in the Pi Browser), set the development URL to the deployed Worker | not done |
-| ☐ | M3 proof: sign in and make real picks in the Pi sandbox | not done |
+| ☑ | Register the app in the Pi Developer Portal (`develop.pi` in the Pi Browser), set the development URL to the deployed Worker | done 27 Sept, domain verified via `/validation-key.txt` |
+| ☑ | M3 proof: sign in and make real picks in the Pi sandbox | done 27 Sept: Pi sign-in, 5 picks (EPL + La Liga, two-tap and sliders) saved on the live database |
 | ☐ | M4 proof: start a league with testnet Pi, and cancel one partway through | not done |
 | ☑ | Set `FAKE_USERS` to `"0"` in `wrangler.jsonc` for the demo deploy, so judges only see Pi sign-in | done (local dev turns it on in `.dev.vars`) |
 | ☐ | Re-check the league price against current mining rates (`LEAGUE_PRICE_PI`, 0.5 now) | not done |
