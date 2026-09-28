@@ -1,5 +1,4 @@
 <!doctype html>
-<!-- DRAFT for review before launch: check the retention and deletion promises below. -->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -23,9 +22,9 @@
     <main>
       <p><a href="/">← Back to Crystal Boot</a></p>
       <h1>Privacy</h1>
-      <p class="muted">Last updated 26 September 2026</p>
+      <p class="muted">Last updated 27 September 2026</p>
 
-      <p>Crystal Boot is a free football forecasting game. It keeps only what it needs to run the game.</p>
+      <p>Crystal Boot is a free football forecasting game run by Adjusted Close LLC. It keeps only what it needs to run the game. Questions go to <a href="mailto:crystalboot@adjustedclose.com">crystalboot@adjustedclose.com</a>.</p>
 
       <h2>What we store</h2>
       <ul>
@@ -33,22 +32,24 @@
         <li><b>Your picks:</b> the percentages you gave for each match, when you made them, and the points they scored.</li>
         <li><b>Your leagues:</b> the private leagues you started or joined, and their names.</li>
         <li><b>Payments:</b> for anything you buy with Pi, the order, the amount, and the Pi payment and transaction ids, so we can prove the purchase and deliver it.</li>
-        <li><b>Sign-in sessions:</b> a scrambled (hashed) copy of your session token, which expires after 30 days. Your phone keeps the token itself.</li>
+        <li><b>Sign-in sessions:</b> a scrambled (hashed) copy of your session token, which expires after 30 days. Your device keeps the token itself.</li>
       </ul>
-
-      <h2>What we don't store</h2>
-      <ul>
-        <li>No email address, phone number, wallet address or real name.</li>
-        <li>No location, contacts or device details.</li>
-        <li>No ads, no ad trackers, no analytics cookies.</li>
-      </ul>
+      <p>The app never asks for your email address, phone number, real name, contacts or location. It has no ads and uses no analytics or tracking cookies.</p>
+      <p>We don't store your wallet address. A payment's transaction id is public on Pi's blockchain, though, so anyone who looks it up there can see which wallet paid.</p>
 
       <h2>Who can see it</h2>
       <p>Your username and scores appear on leaderboards and in the private leagues you're in. Your individual picks are shown only to you. Once a match is settled, the app shows the crowd's average forecast for it, which doesn't identify anyone.</p>
-      <p>The app runs on Cloudflare, which processes requests to deliver the service. Payments go through Pi Network's payment system. We don't sell or share your data with anyone else.</p>
 
-      <h2>Deleting your data</h2>
-      <p>Ask us through the Crystal Boot project on GitHub (jnbowmar/crystal-boot) and we'll delete your account, picks and league memberships. We may keep payment records where we need them for accounting.</p>
+      <h2>Services we use</h2>
+      <p>The app runs on Cloudflare. Like any web host, Cloudflare sees your IP address and browser details with each request and keeps short-lived request logs for a few days. Pi Network handles sign-in and payments under its own privacy policy. We don't sell your data or share it with anyone else.</p>
+
+      <h2>How long we keep it</h2>
+      <p>Your data stays while your account exists. Sign-in sessions expire on their own after 30 days.</p>
+
+      <h2>Deleting your account</h2>
+      <p>Tap <b>Delete account</b> at the bottom of any screen in the app. It removes your picks, scores, league memberships and username straight away. A league you started stays open if friends have joined it, and is deleted if nobody else is in it.</p>
+      <p>If you've paid for anything, we keep that payment record for our tax records. It stays linked to your Crystal Boot user id, with your username removed. If you sign in with Pi again later, you start over with a new, empty account.</p>
+      <p>You can also email <a href="mailto:crystalboot@adjustedclose.com">crystalboot@adjustedclose.com</a> and we'll delete it for you.</p>
 
       <h2>Football data</h2>
       <p>Fixtures and results come from openfootball, which is public domain. The app shows team names only.</p>

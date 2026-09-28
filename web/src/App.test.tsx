@@ -147,6 +147,29 @@ describe('the app', () => {
     expect(localStorage.getItem('crystal-boot.session')).toBeNull()
   })
 
+  it('deletes the account after a confirm, and signs out', async () => {
+    await signedIn()
+    fireEvent.click((await screen.findByText('Bournemouth')).closest('button')!)
+    const sheet = screen.getByRole('dialog')
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Draw' }))
+    fireEvent.click(within(sheet).getByRole('button', { name: /Lean/ }))
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Save pick' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    // Saying no to the confirm keeps everything.
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    expect(env.DB.sqlite.prepare('SELECT count(*) AS n FROM picks').get()).toEqual({ n: 1 })
+
+    confirm.mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    expect((await screen.findByRole('status')).textContent).toBe('Your account has been deleted.')
+    expect(screen.getByRole('button', { name: 'Sign in with Pi' })).toBeTruthy()
+    expect(localStorage.getItem('crystal-boot.session')).toBeNull()
+    expect(env.DB.sqlite.prepare('SELECT count(*) AS n FROM picks').get()).toEqual({ n: 0 })
+    expect(env.DB.sqlite.prepare('SELECT count(*) AS n FROM users').get()).toEqual({ n: 0 })
+  })
+
   it('opens the table on the season when this week has no scores', async () => {
     await signedIn()
     vi.setSystemTime(Date.parse('2026-09-26T12:00:00Z')) // international break

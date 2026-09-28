@@ -732,9 +732,15 @@ button.card:active {
   margin: 8px 0 0;
 }
 
-.disclaimer a {
+.disclaimer a,
+.disclaimer .link {
   color: var(--muted);
   margin-left: 4px;
+}
+
+.disclaimer .link {
+  font-size: inherit;
+  padding: 0;
 }
 
 .disclaimer {

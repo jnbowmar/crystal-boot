@@ -20,6 +20,7 @@ import {
 } from '../scoring/scoring'
 import { startSession, verifyPiToken } from './auth'
 import type { Env } from './db'
+import { deleteAccount } from './account'
 import { HttpError, currentUser, json, readJson, requireUser } from './http'
 import {
   DEFAULT_LEAGUE_PRICE_PI,
@@ -352,6 +353,9 @@ export async function handle(req: Request, env: Env, now: number, fetcher: Fetch
         return await postAuth(req, env, now, fetcher)
       case 'GET /api/me':
         return await getMe(req, env, now)
+      case 'POST /api/account/delete':
+        await deleteAccount(env.DB, await requireUser(req, env, now), now)
+        return json({ ok: true })
       case 'GET /api/matches':
         return await getMatches(req, env, url, now)
       case 'GET /api/picks':

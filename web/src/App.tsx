@@ -40,7 +40,7 @@ function joinCodeFromUrl(): string | null {
 type State =
   | { phase: 'starting' }
   | { phase: 'signing-in' }
-  | { phase: 'signed-out'; error: string | null }
+  | { phase: 'signed-out'; error: string | null; message?: string }
   | { phase: 'signed-in'; user: User }
 
 export function App({ signIn = piSignIn }: { signIn?: typeof piSignIn }) {
@@ -130,6 +130,24 @@ export function App({ signIn = piSignIn }: { signIn?: typeof piSignIn }) {
     setState({ phase: 'signed-out', error: null })
   }
 
+  async function deleteAccount() {
+    const ok = window.confirm(
+      'Delete your Crystal Boot account? Your picks, scores and league memberships are removed for good. ' +
+        "Leagues you started stay open for friends who've joined them.",
+    )
+    if (!ok) return
+    try {
+      await api.deleteAccount()
+    } catch (e) {
+      if (!onUnauthorized(e)) setNotice(e instanceof Error ? `Couldn't delete your account: ${e.message}` : String(e))
+      return
+    }
+    auth.current = null
+    store(SESSION_KEY, null)
+    store(FAKE_KEY, null)
+    setState({ phase: 'signed-out', error: null, message: 'Your account has been deleted.' })
+  }
+
   async function testSignIn(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const name = String(new FormData(e.currentTarget).get('name') ?? '').trim()
@@ -161,6 +179,11 @@ export function App({ signIn = piSignIn }: { signIn?: typeof piSignIn }) {
         {state.error && (
           <p className="error" role="alert">
             {state.error}
+          </p>
+        )}
+        {state.message && (
+          <p className="note" role="status">
+            {state.message}
           </p>
         )}
         <button className="primary" onClick={() => signInWithPi(config?.piSandbox ?? false)}>
@@ -210,7 +233,7 @@ export function App({ signIn = piSignIn }: { signIn?: typeof piSignIn }) {
             signIn={signIn}
           />
         )}
-        <Disclaimer />
+        <Disclaimer onDeleteAccount={deleteAccount} />
       </main>
       <nav className="tabs" aria-label="Sections">
         {(
@@ -242,10 +265,15 @@ function Logo({ small = false }: { small?: boolean }) {
   )
 }
 
-function Disclaimer() {
+function Disclaimer({ onDeleteAccount }: { onDeleteAccount?: () => void }) {
   return (
     <p className="disclaimer">
       Free to play. No wagering. Scores are for bragging rights. <a href="/privacy.html">Privacy</a>
+      {onDeleteAccount && (
+        <button className="link" onClick={onDeleteAccount}>
+          Delete account
+        </button>
+      )}
     </p>
   )
 }

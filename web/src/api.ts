@@ -113,6 +113,7 @@ export function createApi(getAuth: () => Auth, fetcher: typeof fetch = (...a) =>
     auth: (accessToken: string) =>
       call<{ token: string; expiresAt: string; user: User }>('POST', '/auth', { accessToken }),
     me: () => call<{ user: User }>('GET', '/me'),
+    deleteAccount: () => call<{ ok: true }>('POST', '/account/delete'),
     matches: (from: string, to: string, league?: League) =>
       call<{ matches: Match[] }>(
         'GET',
