@@ -11,6 +11,8 @@ import {
   leaderboard,
   quickPick,
   validatePick,
+  weekKey,
+  weekStart,
   type Confidence,
   type League,
   type Outcome,
@@ -21,6 +23,7 @@ import { startSession, verifyPiToken } from './auth'
 import type { Env } from './db'
 import { deleteAccount } from './account'
 import { HttpError, currentUser, json, readJson, requireUser } from './http'
+import { setBanker, streakStatus, streaks } from './streaks'
 import {
   DEFAULT_LEAGUE_PRICE_PI,
   joinLeague,
@@ -86,6 +89,7 @@ interface MatchRow {
   d: number | null
   a: number | null
   points: number | null
+  banker_week: number | null
 }
 
 function matchView(m: MatchRow, now: number) {
@@ -105,12 +109,13 @@ function matchView(m: MatchRow, now: number) {
     crowd: m.crowd_n ? { H: m.crowd_h, D: m.crowd_d, A: m.crowd_a, n: m.crowd_n } : null,
     pick: m.h === null ? null : { H: m.h, D: m.d, A: m.a },
     points: m.points,
+    banker: m.banker_week !== null,
   }
 }
 
 const MATCH_COLUMNS = `m.id, m.league, m.round, m.home, m.away, m.date, m.time, m.kickoff_at,
   m.status, m.home_goals, m.away_goals, m.result, m.crowd_h, m.crowd_d, m.crowd_a, m.crowd_n,
-  p.h, p.d, p.a, p.points`
+  p.h, p.d, p.a, p.points, p.banker_week`
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -209,9 +214,7 @@ async function postPick(req: Request, env: Env, now: number): Promise<Response> 
  * counts with its weekend and midweek rounds start a new week.
  */
 export function weekOf(t: number): { start: number; end: number } {
-  const midnight = Math.floor(t / DAY) * DAY
-  const sinceTuesday = (new Date(midnight).getUTCDay() + 5) % 7
-  const start = midnight - sinceTuesday * DAY
+  const start = weekStart(weekKey(t))
   return { start, end: start + 7 * DAY }
 }
 
@@ -247,11 +250,16 @@ async function getLeaderboard(req: Request, env: Env, url: URL, now: number): Pr
     .bind(league, start, end, privateLeague)
     .all<ScoredPick & { username: string }>()
   const names = new Map(results.map((r) => [r.userId, r.username]))
-  const standings = leaderboard(results).map((s) => ({ ...s, username: names.get(s.userId) }))
+  const streakOf = await streaks(env.DB, now)
+  const standings = leaderboard(results).map((s) => ({
+    ...s,
+    username: names.get(s.userId),
+    streak: streakOf.get(s.userId) ?? 0,
+  }))
   // The caller's own line, including before their first scored pick.
   let me = null
   if (user !== null) {
-    me = standings.find((s) => s.userId === user) ?? { rank: null, userId: user, picks: 0, totalPoints: 0, avgPoints: null }
+    me = standings.find((s) => s.userId === user) ?? { rank: null, userId: user, picks: 0, totalPoints: 0, avgPoints: null, streak: streakOf.get(user) ?? 0 }
   }
   return json({
     scope,
@@ -347,6 +355,16 @@ export async function handle(req: Request, env: Env, now: number, fetcher: Fetch
       case 'POST /api/account/delete':
         await deleteAccount(env.DB, await requireUser(req, env, now), now)
         return json({ ok: true })
+      case 'GET /api/streak':
+        return json(await streakStatus(env.DB, await requireUser(req, env, now), now))
+      case 'POST /api/banker': {
+        const user = await requireUser(req, env, now)
+        const { matchId, on } = await readJson(req)
+        if (typeof matchId !== 'string') throw new HttpError(400, 'matchId is required')
+        if (typeof on !== 'boolean') throw new HttpError(400, 'on must be true or false')
+        await setBanker(env.DB, user, matchId, on, now)
+        return json({ matchId, banker: on })
+      }
       case 'GET /api/matches':
         return await getMatches(req, env, url, now)
       case 'GET /api/picks':

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { League } from '../../src/scoring/scoring'
-import type { Api, Match, PickBody } from './api'
+import { weekKey, type League } from '../../src/scoring/scoring'
+import type { Api, Match, PickBody, StreakStatus } from './api'
 import { PickSheet } from './PickSheet'
 import { kickoffLabel, localDay, lockLabel, shortName } from './pick'
 
@@ -47,6 +47,7 @@ export function MatchCard({ m, now, onOpen }: { m: Match; now: number; onOpen?: 
       </div>
       <div className="meta">
         {m.pick ? <PickChip m={m} /> : !m.locked && <span className="cta">Make your pick</span>}
+        {m.banker && <span className="tag banker">Banker ×2</span>}
         {m.points !== null && <span className="points">{m.points} pts</span>}
       </div>
     </>
@@ -66,10 +67,16 @@ export function Matches({ api, onUnauthorized }: { api: Api; onUnauthorized: (e:
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState<Match | null>(null)
   const [now, setNow] = useState(() => Date.now())
+  const [streak, setStreak] = useState<StreakStatus | null>(null)
+
+  const loadStreak = useCallback(() => {
+    api.streak().then(setStreak, () => {}) // the bar is extra; the list still works without it
+  }, [api])
 
   const load = useCallback(async () => {
     setError(null)
     const t = Date.now()
+    loadStreak()
     try {
       const { matches } = await api.matches(iso(t - 3 * DAY), iso(t + 21 * DAY), league === 'all' ? undefined : league)
       setMatches(matches)
@@ -77,7 +84,7 @@ export function Matches({ api, onUnauthorized }: { api: Api; onUnauthorized: (e:
     } catch (e) {
       if (!onUnauthorized(e)) setError(e instanceof Error ? e.message : String(e))
     }
-  }, [api, league, onUnauthorized])
+  }, [api, league, onUnauthorized, loadStreak])
 
   useEffect(() => {
     void load()
@@ -89,17 +96,37 @@ export function Matches({ api, onUnauthorized }: { api: Api; onUnauthorized: (e:
     return () => clearInterval(id)
   }, [])
 
-  async function save(m: Match, body: PickBody) {
-    let pick
+  async function save(m: Match, body: PickBody, banker: boolean) {
     try {
-      ;({ pick } = await api.savePick(m.id, body))
+      const { pick } = await api.savePick(m.id, body)
+      setMatches((ms) => ms?.map((x) => (x.id === m.id ? { ...x, pick } : x)) ?? null)
+      if (banker !== m.banker) {
+        await api.setBanker(m.id, banker)
+        const week = weekKey(Date.parse(m.kickoffAt))
+        // One banker a week: setting this one moves it off the others.
+        setMatches(
+          (ms) =>
+            ms?.map((x) =>
+              x.id === m.id
+                ? { ...x, banker }
+                : banker && x.banker && weekKey(Date.parse(x.kickoffAt)) === week
+                  ? { ...x, banker: false }
+                  : x,
+            ) ?? null,
+        )
+      }
     } catch (e) {
       onUnauthorized(e)
       throw e
     }
-    setMatches((ms) => ms?.map((x) => (x.id === m.id ? { ...x, pick } : x)) ?? null)
+    loadStreak()
     setOpen(null)
   }
+
+  const bankerElsewhere = (m: Match) =>
+    matches?.find(
+      (x) => x.banker && x.id !== m.id && weekKey(Date.parse(x.kickoffAt)) === weekKey(Date.parse(m.kickoffAt)),
+    ) ?? null
 
   const openForPicks = matches?.filter((m) => m.status === 'scheduled' && Date.parse(m.kickoffAt) > now) ?? []
   const inPlay = matches?.filter((m) => m.status === 'scheduled' && Date.parse(m.kickoffAt) <= now) ?? []
@@ -119,6 +146,8 @@ export function Matches({ api, onUnauthorized }: { api: Api; onUnauthorized: (e:
           </button>
         ))}
       </div>
+
+      {streak && <StreakBar s={streak} />}
 
       {error && (
         <p className="error" role="alert">
@@ -157,7 +186,29 @@ export function Matches({ api, onUnauthorized }: { api: Api; onUnauthorized: (e:
         </div>
       )}
 
-      {open && <PickSheet match={open} onSave={(body) => save(open, body)} onClose={() => setOpen(null)} />}
+      {open && (
+        <PickSheet
+          match={open}
+          bankerElsewhere={bankerElsewhere(open)}
+          onSave={(body, banker) => save(open, body, banker)}
+          onClose={() => setOpen(null)}
+        />
+      )}
     </section>
+  )
+}
+
+export function StreakBar({ s }: { s: StreakStatus }) {
+  const { matches, picks, target } = s.week
+  const run = s.streak > 0 ? `🔥 ${s.streak}-week streak` : 'No streak yet'
+  let detail: string
+  if (matches === 0) detail = s.streak > 0 ? 'No matches this week. Your streak is safe.' : 'No matches this week.'
+  else if (picks >= target) detail = `${picks} picks this week. Streak kept.`
+  else detail = `${picks} of ${target} picks this week`
+  return (
+    <div className="streak-bar">
+      <b>{run}</b>
+      <span className="muted">{detail}</span>
+    </div>
   )
 }

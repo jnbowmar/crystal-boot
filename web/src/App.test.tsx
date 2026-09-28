@@ -120,6 +120,48 @@ describe('the app', () => {
     expect(standing.textContent).toContain('1 pick · avg')
   })
 
+  it('makes a pick the banker, doubling it, and moves the banker to another match', async () => {
+    await signedIn()
+    expect((await screen.findByText(/picks this week/)).textContent).toBe('0 of 10 picks this week')
+    fireEvent.click((await screen.findByText('Bournemouth')).closest('button')!)
+    let sheet = screen.getByRole('dialog')
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Liverpool win' }))
+    fireEvent.click(within(sheet).getByRole('button', { name: /Confident/ }))
+    const pick = quickPick('A', 'confident', BASE_RATES['en.1'])
+    fireEvent.click(within(sheet).getByRole('checkbox', { name: /Banker: double points/ }))
+    // The preview doubles.
+    expect(within(sheet).getByRole('row', { name: /Liverpool win/ }).textContent).toBe(
+      `Liverpool win${pick.A}%${2 * points(pick, 'A')}`,
+    )
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Save pick' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    const card = screen.getByText('Bournemouth').closest('button')!
+    expect(within(card).getByText('Banker ×2')).toBeTruthy()
+    expect(screen.getByText('1 of 10 picks this week')).toBeTruthy()
+
+    // A second match the same weekend takes the banker over.
+    const other = screen.getAllByRole('button', { name: /Make your pick/ })[0]
+    fireEvent.click(other)
+    sheet = screen.getByRole('dialog')
+    expect(within(sheet).getByText(/Moves it from Bournemouth v Liverpool/)).toBeTruthy()
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Draw' }))
+    fireEvent.click(within(sheet).getByRole('button', { name: /Lean/ }))
+    fireEvent.click(within(sheet).getByRole('checkbox', { name: /Banker/ }))
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Save pick' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(screen.getAllByText('Banker ×2')).toHaveLength(1)
+    expect(within(card).queryByText('Banker ×2')).toBeNull()
+    const rows = env.DB.sqlite.prepare('SELECT match_id FROM picks WHERE banker_week IS NOT NULL').all()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).not.toEqual({ match_id: MATCH })
+
+    // Scored double after the match.
+    vi.setSystemTime(TUESDAY)
+    await sync(env.DB, TUESDAY, feedFetcher(feed), LEAGUE_IDS)
+    const banked = env.DB.sqlite.prepare('SELECT h, d, a, points, m.result FROM picks JOIN matches m ON m.id = match_id WHERE banker_week IS NOT NULL').get() as { h: number; d: number; a: number; points: number; result: 'H' | 'D' | 'A' }
+    expect(banked.points).toBe(2 * points({ H: banked.h, D: banked.d, A: banked.a }, banked.result))
+  })
+
   it('makes an exact pick with the sliders', async () => {
     await signedIn()
     fireEvent.click((await screen.findByText('Bournemouth')).closest('button')!)

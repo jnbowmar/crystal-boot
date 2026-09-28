@@ -86,6 +86,8 @@ A Cloudflare Worker with a D1 (SQLite) database, in [`src/worker/`](src/worker/)
 | `GET /api/matches?league=en.1&from=&to=` | Fixtures with status, result, crowd forecast and your pick |
 | `POST /api/picks` | `{matchId, pick: {H, D, A}}` or two-tap `{matchId, outcome, confidence}`. Refused from kickoff on |
 | `GET /api/picks` | Your picks and points |
+| `POST /api/banker` | `{matchId, on}`: make a pick your banker (double points, one per Tuesday-to-Monday week), move it, or take it off. Locked once the banked match kicks off |
+| `GET /api/streak` | Your streak and this week's progress (10 picks, or every match in a shorter week) |
 | `GET /api/leaderboard?league=all&period=week\|season&date=&scope=global\|league:<id>` | Ranked by total points (ties to the higher average), plus your own line. League scope is members only |
 | `GET /api/leagues`, `POST /api/leagues/join`, `POST /api/leagues/leave` | Your leagues; join with a code (free); leave |
 | `GET /api/leagues/preview?code=` | A league's name and size, before joining |

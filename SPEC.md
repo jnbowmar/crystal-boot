@@ -41,6 +41,8 @@ points = round(100 − 50 × brier)                              # 100 perfect, 
 - **Worked example (Arsenal 3-0 Coventry):** Lock on Arsenal `95/2/3` → Brier 0.0038 → **100**. No opinion `33/33/34` → 0.6734 → **66**. Confident Coventry `5/15/80` → 1.565 → **22**.
 - A confident wrong pick hurts. That's the lesson of the game and the book: calibration beats bravado.
 - No pick = no score, not zero. Leaderboards rank by **total points** (changed 2026-09-27 from average points with a minimum pick count, James's call: most points wins is what players expect, and it rewards coming back every weekend). Equal totals go to the higher average. Average points and beat-the-crowd stay as secondary stats.
+- **Banker (added 2026-09-27):** once a week (Tuesday to Monday UTC, the same weeks as the tables), one pick counts double, so a perfect call is 200. Free for everyone and never sold. It can move until the banked match kicks off, then it's locked for the week. `picks.points` stores the doubled score, so tables and averages need no special case.
+- **Streaks (added 2026-09-27):** weeks in a row with at least 10 picks (`STREAK_TARGET`), or every match in a week with fewer. Weeks without matches (international breaks) are skipped, and the week in progress never breaks it. Shown as a flame by each name on the tables and a progress bar on Matches. 10 rather than "every match" because two leagues already make ~20 a week and more leagues would make "every match" a chore.
 
 **Baselines shown next to your score (what makes it feel smart):**
 - **Crowd:** the average probability of all app users on that match, frozen at kickoff. "You beat the crowd on 7 of 10."

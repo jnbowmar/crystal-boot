@@ -206,7 +206,7 @@ describe('M2 proof: the 9/20 matches settle and score correctly', async () => {
         return { userId: `fake:${user}`, matchId: id, points: points(pick, actual.get(id)!) }
       }),
     )
-    expect(body.standings.map(({ username: _, ...s }: { username: string }) => s)).toEqual(expected)
+    expect(body.standings.map(({ username: _, streak: __, ...s }: { username: string; streak: number }) => s)).toEqual(expected)
     expect(body.standings).toHaveLength(12)
   })
 
@@ -217,7 +217,7 @@ describe('M2 proof: the 9/20 matches settle and score correctly', async () => {
     expect(season.body.me).toEqual(season.body.standings.find((s: { userId: string }) => s.userId === 'fake:fan_1'))
     expect(season.body.me).toMatchObject({ userId: 'fake:fan_1', picks: 20 })
     const newcomer = await call(tuesday, 'GET', '/api/leaderboard?period=week&date=2026-09-20', { user: 'newbie' })
-    expect(newcomer.body.me).toEqual({ rank: null, userId: 'fake:newbie', picks: 0, totalPoints: 0, avgPoints: null })
+    expect(newcomer.body.me).toEqual({ rank: null, userId: 'fake:newbie', picks: 0, totalPoints: 0, avgPoints: null, streak: 0 })
     expect((await call(tuesday, 'GET', '/api/leaderboard')).body.me).toBeNull()
   })
 

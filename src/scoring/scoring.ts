@@ -161,3 +161,56 @@ export function beatCrowd(
   }
   return { beat, of: yours.length }
 }
+
+// Banker: once a week, one pick counts double.
+export const BANKER_MULTIPLIER = 2
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * The week a kickoff belongs to, as the day number (days since 1970-01-01,
+ * UTC) of the Tuesday that starts it. Weeks run Tuesday to Monday so a Monday
+ * night match counts with its weekend. Epoch day d is a Tuesday when
+ * (d + 2) % 7 is 0, which the SQL twin in the Worker relies on too.
+ */
+export function weekKey(t: number): number {
+  const d = Math.floor(t / DAY_MS)
+  return d - ((d + 2) % 7)
+}
+
+/** Milliseconds at the start of a week key. */
+export function weekStart(key: number): number {
+  return key * DAY_MS
+}
+
+// Streak: weeks in a row with at least this many picks (or every match, in a
+// week with fewer). Weeks without matches, like international breaks, are
+// skipped rather than breaking the run.
+export const STREAK_TARGET = 10
+
+export interface WeekTally {
+  week: number
+  /** Matches that week (void ones left out). */
+  matches: number
+  /** The player's picks on those matches. */
+  picks: number
+}
+
+export function streakTarget(matches: number): number {
+  return Math.min(STREAK_TARGET, matches)
+}
+
+/**
+ * The player's current streak. The week in progress adds to it once it's
+ * reached the target, and never breaks it before then.
+ */
+export function streak(weeks: readonly WeekTally[], currentWeek: number): number {
+  const played = weeks.filter((w) => w.matches > 0 && w.week <= currentWeek).sort((a, b) => b.week - a.week)
+  let run = 0
+  for (const w of played) {
+    const done = w.picks >= streakTarget(w.matches)
+    if (done) run += 1
+    else if (w.week !== currentWeek) break
+  }
+  return run
+}

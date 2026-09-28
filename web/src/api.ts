@@ -17,7 +17,9 @@ export interface Match {
   result: Outcome | null
   crowd: (Probs & { n: number }) | null
   pick: Probs | null
+  /** Points include the banker's double. */
   points: number | null
+  banker: boolean
 }
 
 export interface Standing {
@@ -27,6 +29,7 @@ export interface Standing {
   picks: number
   totalPoints: number
   avgPoints: number | null
+  streak: number
 }
 
 export interface Leaderboard {
@@ -83,6 +86,11 @@ export class ApiError extends Error {
 
 export type PickBody = { pick: Probs } | { outcome: Outcome; confidence: Confidence }
 
+export interface StreakStatus {
+  streak: number
+  week: { matches: number; picks: number; target: number }
+}
+
 export function createApi(getAuth: () => Auth, fetcher: typeof fetch = (...a) => fetch(...a)) {
   async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
     const auth = getAuth()
@@ -120,6 +128,8 @@ export function createApi(getAuth: () => Auth, fetcher: typeof fetch = (...a) =>
         `/matches?${new URLSearchParams({ from, to, ...(league && { league }) })}`,
       ),
     picks: () => call<{ picks: Match[] }>('GET', '/picks'),
+    streak: () => call<StreakStatus>('GET', '/streak'),
+    setBanker: (matchId: string, on: boolean) => call<{ matchId: string; banker: boolean }>('POST', '/banker', { matchId, on }),
     savePick: (matchId: string, body: PickBody) =>
       call<{ matchId: string; pick: Probs }>('POST', '/picks', { matchId, ...body }),
     leaderboard: (period: 'week' | 'season', league: League | 'all', scope = 'global') =>

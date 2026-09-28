@@ -113,9 +113,9 @@ describe('league tables', () => {
       INSERT INTO matches (id, league, season, home, away, date, kickoff_at, home_goals, away_goals,
         score_source, status, result, updated_at)
         VALUES ('m1', 'en.1', '2026-27', 'A', 'B', '2026-09-27', ${NOW - 86400000}, 2, 0, 'feed', 'settled', 'H', 0);
-      INSERT INTO picks VALUES ('pi:u-james', 'm1', 70, 20, 10, 94, 0, 0);
-      INSERT INTO picks VALUES ('fake:ada', 'm1', 40, 30, 30, 69, 0, 0);
-      INSERT INTO picks VALUES ('fake:outsider', 'm1', 95, 3, 2, 100, 0, 0);
+      INSERT INTO picks (user_id, match_id, h, d, a, points, created_at, updated_at) VALUES ('pi:u-james', 'm1', 70, 20, 10, 94, 0, 0);
+      INSERT INTO picks (user_id, match_id, h, d, a, points, created_at, updated_at) VALUES ('fake:ada', 'm1', 40, 30, 30, 69, 0, 0);
+      INSERT INTO picks (user_id, match_id, h, d, a, points, created_at, updated_at) VALUES ('fake:outsider', 'm1', 95, 3, 2, 100, 0, 0);
     `)
     const path = `/api/leaderboard?period=season&scope=league:${league.id}`
     const table = await call('GET', path, { token: session })
@@ -139,8 +139,8 @@ describe('league tables', () => {
       `INSERT INTO matches (id, league, season, home, away, date, kickoff_at, home_goals, away_goals, score_source,
         status, result, updated_at) VALUES (?, 'en.1', '2026-27', ?, 'X', '2026-09-26', ?, 1, 0, 'feed', 'settled', 'H', 0)`,
     )
-    const insPick = env.DB.sqlite.prepare("INSERT INTO picks VALUES ('pi:u-james', ?, 60, 20, 20, 90, 0, 0)")
-    const outsider = env.DB.sqlite.prepare("INSERT INTO picks VALUES ('fake:outsider', ?, 95, 3, 2, 100, 0, 0)")
+    const insPick = env.DB.sqlite.prepare("INSERT INTO picks (user_id, match_id, h, d, a, points, created_at, updated_at) VALUES ('pi:u-james', ?, 60, 20, 20, 90, 0, 0)")
+    const outsider = env.DB.sqlite.prepare("INSERT INTO picks (user_id, match_id, h, d, a, points, created_at, updated_at) VALUES ('fake:outsider', ?, 95, 3, 2, 100, 0, 0)")
     env.DB.sqlite.exec("INSERT INTO users (id, username, created_at) VALUES ('fake:outsider', 'outsider', 0)")
     for (let i = 0; i < 10; i++) {
       insMatch.run(`m${i}`, `Team ${i}`, Date.parse('2026-09-26T14:00:00Z'))
@@ -152,7 +152,8 @@ describe('league tables', () => {
     expect(global.body.standings.map((s: { username: string }) => s.username)).toEqual(['outsider', 'james'])
     const week = await call('GET', `${q}&scope=league:${league.id}`, { token: session })
     expect(week.body.standings).toEqual([
-      { rank: 1, userId: 'pi:u-james', username: 'james', picks: 10, totalPoints: 900, avgPoints: 90 },
+      // Ten picks in the only week with matches: a one-week streak.
+      { rank: 1, userId: 'pi:u-james', username: 'james', picks: 10, totalPoints: 900, avgPoints: 90, streak: 1 },
     ])
   })
 })

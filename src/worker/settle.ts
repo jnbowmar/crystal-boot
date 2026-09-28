@@ -4,7 +4,7 @@
 // invocation).
 
 import { SEASON, feedUrl, parseFeed, type Fixture } from '../data/openfootball'
-import type { League } from '../scoring/scoring'
+import { BANKER_MULTIPLIER, type League } from '../scoring/scoring'
 import type { Db } from './db'
 
 /** A match with no result this long after kickoff is voided (its picks don't count). */
@@ -88,6 +88,7 @@ export async function settle(db: Db, now: number): Promise<{ settled: number; vo
     db
       .prepare(
         `UPDATE picks SET points = ${POINTS_SQL}
+           * CASE WHEN picks.banker_week IS NULL THEN 1 ELSE ${BANKER_MULTIPLIER} END
          FROM matches AS r
          WHERE r.id = picks.match_id AND r.status = 'settled' AND r.settled_at = ?1`,
       )

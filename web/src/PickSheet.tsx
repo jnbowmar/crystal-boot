@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  BANKER_MULTIPLIER,
   BASE_RATES,
   CONFIDENCE,
   OUTCOMES,
@@ -25,15 +26,18 @@ function outcomeName(o: Outcome, m: Match): string {
 
 interface Props {
   match: Match
-  onSave: (body: PickBody) => Promise<void>
+  /** This week's banker, if it's on another match. */
+  bankerElsewhere?: Match | null
+  onSave: (body: PickBody, banker: boolean) => Promise<void>
   onClose: () => void
 }
 
-export function PickSheet({ match, onSave, onClose }: Props) {
+export function PickSheet({ match, bankerElsewhere = null, onSave, onClose }: Props) {
   const [mode, setMode] = useState<'quick' | 'exact'>(match.pick ? 'exact' : 'quick')
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [confidence, setConfidence] = useState<Confidence | null>(null)
   const [exact, setExact] = useState<Probs>(match.pick ?? { H: 34, D: 33, A: 33 })
+  const [banker, setBanker] = useState(match.banker)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -49,7 +53,7 @@ export function PickSheet({ match, onSave, onClose }: Props) {
     setSaving(true)
     setError(null)
     try {
-      await onSave(mode === 'quick' && outcome && confidence ? { outcome, confidence } : { pick: exact })
+      await onSave(mode === 'quick' && outcome && confidence ? { outcome, confidence } : { pick: exact }, banker)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setSaving(false)
@@ -146,12 +150,31 @@ export function PickSheet({ match, onSave, onClose }: Props) {
                   <tr key={o}>
                     <td>{outcomeName(o, match)}</td>
                     <td>{preview[o]}%</td>
-                    <td>{points(preview, o)}</td>
+                    <td>{points(preview, o) * (banker ? BANKER_MULTIPLIER : 1)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+        )}
+
+        {bankerElsewhere?.locked ? (
+          <p className="fine banker-note">
+            Your banker this week ({shortName(bankerElsewhere.home)} v {shortName(bankerElsewhere.away)}) has kicked off.
+          </p>
+        ) : (
+          <label className="banker-toggle">
+            <input type="checkbox" checked={banker} onChange={(e) => setBanker(e.target.checked)} />
+            <span>
+              <b>Banker: double points</b>
+              <small>
+                One per week.
+                {bankerElsewhere && !banker
+                  ? ` Moves it from ${shortName(bankerElsewhere.home)} v ${shortName(bankerElsewhere.away)}.`
+                  : ' You can move it until this match kicks off.'}
+              </small>
+            </span>
+          </label>
         )}
 
         {error && (

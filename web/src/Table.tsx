@@ -95,6 +95,11 @@ export function Table({
                   <span className="rank">{s.rank}</span>
                   <span className="name">
                     {s.username}
+                    {s.streak > 0 && (
+                      <span className="flame" aria-label={`${s.streak}-week streak`}>
+                        🔥{s.streak}
+                      </span>
+                    )}
                     <small className="muted" title="Average points per pick">
                       {s.picks} {s.picks === 1 ? 'pick' : 'picks'} · avg {Math.round(s.avgPoints ?? 0)}
                     </small>

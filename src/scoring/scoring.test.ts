@@ -13,7 +13,10 @@ import {
   outcomeFromScore,
   points,
   quickPick,
+  streak,
   validatePick,
+  weekKey,
+  weekStart,
   type Confidence,
   type Outcome,
   type Probs,
@@ -199,5 +202,44 @@ describe('beatCrowd', () => {
         { pick: { H: 51, D: 25, A: 24 }, crowd: c, actual: 'H' }, // same points, better Brier
       ]),
     ).toEqual({ beat: 2, of: 4 })
+  })
+})
+
+describe('weekKey', () => {
+  const key = (iso: string) => weekKey(Date.parse(iso))
+  it('runs Tuesday to Monday in UTC', () => {
+    const tue = key('2026-09-15T00:00:00Z')
+    expect(new Date(weekStart(tue)).toISOString()).toBe('2026-09-15T00:00:00.000Z')
+    expect(key('2026-09-20T14:00:00Z')).toBe(tue) // Sunday
+    expect(key('2026-09-21T23:59:59Z')).toBe(tue) // Monday night
+    expect(key('2026-09-22T00:00:00Z')).toBe(tue + 7) // next Tuesday
+    expect(key('2026-09-14T23:59:59Z')).toBe(tue - 7)
+  })
+})
+
+describe('streak', () => {
+  const W = 1000 // any week key; weeks are 7 apart
+  const wk = (i: number, matches: number, picks: number) => ({ week: W + 7 * i, matches, picks })
+  it('counts weeks in a row that reached the target', () => {
+    expect(streak([wk(0, 20, 10), wk(1, 20, 12), wk(2, 20, 15)], W + 14)).toBe(3)
+    expect(streak([wk(0, 20, 10), wk(1, 20, 9), wk(2, 20, 15)], W + 14)).toBe(1)
+  })
+  it('needs every match in a short week', () => {
+    expect(streak([wk(0, 20, 10), wk(1, 4, 4)], W + 7)).toBe(2)
+    expect(streak([wk(0, 20, 10), wk(1, 4, 3)], W + 7)).toBe(1) // this week isn't done yet
+    expect(streak([wk(0, 20, 10), wk(1, 4, 3), wk(2, 20, 10)], W + 14)).toBe(1)
+  })
+  it('skips weeks with no matches (international breaks)', () => {
+    expect(streak([wk(0, 20, 10), wk(1, 0, 0), wk(2, 0, 0), wk(3, 20, 11)], W + 21)).toBe(2)
+    expect(streak([wk(0, 20, 10)], W + 21)).toBe(1) // missing weeks = no matches
+  })
+  it("doesn't break on the week in progress, and adds it once it's done", () => {
+    expect(streak([wk(0, 20, 10), wk(1, 20, 2)], W + 7)).toBe(1)
+    expect(streak([wk(0, 20, 10), wk(1, 20, 10)], W + 7)).toBe(2)
+  })
+  it('ignores future weeks and starts at zero', () => {
+    expect(streak([wk(0, 20, 10), wk(1, 20, 20)], W)).toBe(1)
+    expect(streak([], W)).toBe(0)
+    expect(streak([wk(0, 20, 3)], W + 7)).toBe(0)
   })
 })
