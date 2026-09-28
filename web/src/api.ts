@@ -25,6 +25,7 @@ export interface Standing {
   userId: string
   username?: string
   picks: number
+  totalPoints: number
   avgPoints: number | null
 }
 
@@ -34,7 +35,6 @@ export interface Leaderboard {
   period: 'week' | 'season'
   from?: string
   to?: string
-  minPicks: number
   standings: Standing[]
   me: Standing | null
 }

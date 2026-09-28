@@ -40,7 +40,7 @@ points = round(100 − 50 × brier)                              # 100 perfect, 
 - **Picks are stored as whole percentages summing to 100** (`{H: 65, D: 15, A: 20}`). Points are computed in integer math, and with whole percentages a score can never land on exactly .5, so rounding is never ambiguous (proof in `scoring.ts`). A "lazy" 33/33/34 scores 66 or 67 depending on which outcome got the 34.
 - **Worked example (Arsenal 3-0 Coventry):** Lock on Arsenal `95/2/3` → Brier 0.0038 → **100**. No opinion `33/33/34` → 0.6734 → **66**. Confident Coventry `5/15/80` → 1.565 → **22**.
 - A confident wrong pick hurts. That's the lesson of the game and the book: calibration beats bravado.
-- No pick = no score, not zero. Leaderboards rank by **average points with a minimum pick count** (e.g. ≥ 10 picks for the week, ≥ 50 for the season), so skipping hard matches doesn't win.
+- No pick = no score, not zero. Leaderboards rank by **total points** (changed 2026-09-27 from average points with a minimum pick count, James's call: most points wins is what players expect, and it rewards coming back every weekend). Equal totals go to the higher average. Average points and beat-the-crowd stay as secondary stats.
 
 **Baselines shown next to your score (what makes it feel smart):**
 - **Crowd:** the average probability of all app users on that match, frozen at kickoff. "You beat the crowd on 7 of 10."

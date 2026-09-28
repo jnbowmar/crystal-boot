@@ -149,44 +149,42 @@ describe('leaderboard', () => {
   const picks = (userId: string, pts: number[]): ScoredPick[] =>
     pts.map((points, i) => ({ userId, matchId: `m${i}`, points }))
 
-  it('ranks by average and drops players under the minimum', () => {
-    const board = leaderboard(
-      [
-        ...picks('ada', [80, 70, 90]), // 80.0
-        ...picks('bo', [100, 100]), // 100 but only 2 picks
-        ...picks('cy', [60, 70, 80, 90]), // 75.0
-      ],
-      3,
-    )
-    expect(board.map((r) => [r.rank, r.userId, r.avgPoints])).toEqual([
-      [1, 'ada', 80],
-      [2, 'cy', 75],
+  it('ranks by total points, so picking more matches counts', () => {
+    const board = leaderboard([
+      ...picks('ada', [80, 70, 90]), // 240
+      ...picks('bo', [100, 100]), // 200: perfect, but fewer picks
+      ...picks('cy', [60, 70, 80, 90]), // 300
+    ])
+    expect(board.map((r) => [r.rank, r.userId, r.totalPoints, r.avgPoints])).toEqual([
+      [1, 'cy', 300, 75],
+      [2, 'ada', 240, 80],
+      [3, 'bo', 200, 100],
     ])
   })
-  it('shares ranks on exact ties (1, 2, 2, 4) and lists more picks first', () => {
-    const board = leaderboard(
-      [
-        ...picks('a', [90, 90, 90]), // 90
-        ...picks('b', [70, 70, 70]), // 70, 3 picks
-        ...picks('c', [60, 80, 70, 70, 70, 70]), // 70, 6 picks
-        ...picks('d', [50, 50, 50]),
-      ],
-      3,
-    )
+  it('breaks equal totals by fewer picks (the higher average)', () => {
+    const board = leaderboard([...picks('many', [50, 50, 50, 50]), ...picks('few', [100, 100])])
+    expect(board.map((r) => [r.rank, r.userId])).toEqual([
+      [1, 'few'],
+      [2, 'many'],
+    ])
+  })
+  it('shares ranks when total and picks are both equal (1, 2, 2, 4)', () => {
+    const board = leaderboard([
+      ...picks('a', [90, 90, 90]),
+      ...picks('c', [60, 80, 70]), // 210
+      ...picks('b', [70, 70, 70]), // 210, same picks
+      ...picks('d', [50, 50, 50]),
+    ])
     expect(board.map((r) => [r.rank, r.userId])).toEqual([
       [1, 'a'],
-      [2, 'c'],
       [2, 'b'],
+      [2, 'c'],
       [4, 'd'],
     ])
   })
-  it('ties averages exactly, not by float accident', () => {
-    // 70/3 and 140/6 are the same average
-    const board = leaderboard([...picks('x', [23, 23, 24]), ...picks('y', [23, 23, 23, 24, 24, 23])], 1)
-    expect(board.map((r) => r.rank)).toEqual([1, 1])
-  })
-  it('is empty with no qualifying players', () => {
-    expect(leaderboard(picks('solo', [100]), 10)).toEqual([])
+  it('ranks anyone with a scored pick, and is empty with none', () => {
+    expect(leaderboard(picks('solo', [42]))).toEqual([{ rank: 1, userId: 'solo', picks: 1, totalPoints: 42, avgPoints: 42 }])
+    expect(leaderboard([])).toEqual([])
   })
 })
 

@@ -111,6 +111,13 @@ describe('the app', () => {
     fireEvent.click(screen.getByRole('button', { name: 'My picks' }))
     expect(await screen.findByText(`${points(expected, 'A')} pts`)).toBeTruthy()
     expect(screen.getByText('0–1')).toBeTruthy()
+
+    // One scored pick is enough to be on the table, ranked by total points.
+    fireEvent.click(screen.getByRole('button', { name: 'Table' }))
+    const standing = (await screen.findByText('james')).closest('li')!
+    expect(standing.querySelector('.rank')!.textContent).toBe('1')
+    expect(standing.querySelector('b')!.textContent).toBe(String(points(expected, 'A')))
+    expect(standing.textContent).toContain('1 pick · avg')
   })
 
   it('makes an exact pick with the sliders', async () => {
@@ -179,7 +186,7 @@ describe('the app', () => {
     )
     // Choosing the week yourself sticks, even though it's empty.
     fireEvent.click(screen.getByRole('button', { name: 'This week' }))
-    expect(await screen.findByText(/Nobody has 10 scored picks this week/)).toBeTruthy()
+    expect(await screen.findByText('No scored picks this week yet.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'This week' }).getAttribute('aria-pressed')).toBe('true')
   })
 

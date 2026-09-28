@@ -53,7 +53,7 @@ For the entry, re-record the same flow **in the Pi sandbox with testnet Pi**, so
 2. **0:10** Open the app in the sandbox. Pi sign-in, then the fixture list.
 3. **0:25** Two-tap pick on a real upcoming match. Pause on the "points if it happens" table.
 4. **0:45** Exact % with the sliders on another match.
-5. **1:00** My picks and the table (Season): average points, beating the crowd.
+5. **1:00** My picks and the table (Season): total points, average per pick, beating the crowd.
 6. **1:15** Leagues: start a league, **the Pi payment sheet**, sign with testnet Pi, then the new league with its invite code.
 7. **1:40** A second account joins with the code, and the league table shows both.
 8. **1:55** End card: "Free to play. No wagering." and the repo link.

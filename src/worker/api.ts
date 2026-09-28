@@ -7,7 +7,6 @@ import { LEAGUES } from '../data/openfootball'
 import {
   BASE_RATES,
   CONFIDENCE,
-  MIN_PICKS,
   OUTCOMES,
   leaderboard,
   quickPick,
@@ -248,25 +247,17 @@ async function getLeaderboard(req: Request, env: Env, url: URL, now: number): Pr
     .bind(league, start, end, privateLeague)
     .all<ScoredPick & { username: string }>()
   const names = new Map(results.map((r) => [r.userId, r.username]))
-  const minPicks = MIN_PICKS[period]
-  const standings = leaderboard(results, minPicks).map((s) => ({ ...s, username: names.get(s.userId) }))
-  // The caller's own line, even before they have enough picks to be ranked.
+  const standings = leaderboard(results).map((s) => ({ ...s, username: names.get(s.userId) }))
+  // The caller's own line, including before their first scored pick.
   let me = null
   if (user !== null) {
-    const mine = results.filter((r) => r.userId === user)
-    me = standings.find((s) => s.userId === user) ?? {
-      rank: null,
-      userId: user,
-      picks: mine.length,
-      avgPoints: mine.length ? mine.reduce((t, r) => t + r.points, 0) / mine.length : null,
-    }
+    me = standings.find((s) => s.userId === user) ?? { rank: null, userId: user, picks: 0, totalPoints: 0, avgPoints: null }
   }
   return json({
     scope,
     league,
     period,
     ...(period === 'week' && { from: new Date(start).toISOString(), to: new Date(end).toISOString() }),
-    minPicks,
     standings,
     me,
   })

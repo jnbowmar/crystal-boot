@@ -121,19 +121,19 @@ describe('league tables', () => {
     const table = await call('GET', path, { token: session })
     expect(table.status).toBe(200)
     expect(table.body.scope).toBe(`league:${league.id}`)
-    expect(table.body.me).toMatchObject({ userId: 'pi:u-james', picks: 1, avgPoints: 94 })
-    // Nobody has the season's 50 picks yet, so compare the members' own lines:
-    // the outsider's 100 counts globally but not in the league.
+    expect(table.body.me).toMatchObject({ userId: 'pi:u-james', picks: 1, totalPoints: 94 })
+    // The outsider's 100 counts globally but not in the league.
     const ada = await call('GET', path, { fake: 'ada' })
-    expect(ada.body.me).toMatchObject({ userId: 'fake:ada', avgPoints: 69 })
+    expect(ada.body.me).toMatchObject({ userId: 'fake:ada', totalPoints: 69 })
+    expect(table.body.standings.map((s: { username: string }) => s.username)).toEqual(['james', 'ada'])
     const all = await call('GET', '/api/leaderboard?period=season&scope=global', { fake: 'outsider' })
-    expect(all.body.me).toMatchObject({ avgPoints: 100 })
+    expect(all.body.me).toMatchObject({ rank: 1, totalPoints: 100 })
     expect((await call('GET', path, { fake: 'outsider' })).status).toBe(403)
     expect((await call('GET', path)).status).toBe(401)
     expect((await call('GET', '/api/leaderboard?scope=bogus')).status).toBe(400)
   })
 
-  it('ranks only members once they have enough picks', async () => {
+  it('ranks only members of the league', async () => {
     const { session, league } = await paidLeague()
     const insMatch = env.DB.sqlite.prepare(
       `INSERT INTO matches (id, league, season, home, away, date, kickoff_at, home_goals, away_goals, score_source,
@@ -152,7 +152,7 @@ describe('league tables', () => {
     expect(global.body.standings.map((s: { username: string }) => s.username)).toEqual(['outsider', 'james'])
     const week = await call('GET', `${q}&scope=league:${league.id}`, { token: session })
     expect(week.body.standings).toEqual([
-      { rank: 1, userId: 'pi:u-james', username: 'james', picks: 10, avgPoints: 90 },
+      { rank: 1, userId: 'pi:u-james', username: 'james', picks: 10, totalPoints: 900, avgPoints: 90 },
     ])
   })
 })

@@ -12,7 +12,7 @@ Built for the monthly #PiHackathon, targeting November 2026. The full design is 
   <img src="docs/screenshots/1-matches.png" width="19%" alt="Fixtures with kickoff times in your timezone">
   <img src="docs/screenshots/2-pick.png" width="19%" alt="Two-tap pick with the points each result would score">
   <img src="docs/screenshots/3-my-picks.png" width="19%" alt="Scored picks, average points and beating the crowd">
-  <img src="docs/screenshots/4-table.png" width="19%" alt="Season leaderboard by average points">
+  <img src="docs/screenshots/4-table.png" width="19%" alt="Season leaderboard">
   <img src="docs/screenshots/5-league.png" width="19%" alt="A private league with its invite code and table">
 </p>
 
@@ -43,7 +43,7 @@ For Arsenal 3-0 Coventry:
 | 33 / 33 / 34 | 0.6734 | 66 |
 | 5 / 15 / 80 | 1.565 | 22 |
 
-A confident wrong pick costs the most, so calibration beats bravado. Leaderboards rank by average points with a minimum pick count, so skipping the hard matches doesn't help.
+A confident wrong pick costs the most, so calibration beats bravado. Leaderboards rank by total points, so picking every match pays; on equal totals the higher average goes first.
 
 A small detail I liked: with whole percentages the raw score can never land on exactly .5, so rounding is never a judgment call. The proof is a comment in [`scoring.ts`](src/scoring/scoring.ts), and a test checks every possible pick.
 
@@ -86,7 +86,7 @@ A Cloudflare Worker with a D1 (SQLite) database, in [`src/worker/`](src/worker/)
 | `GET /api/matches?league=en.1&from=&to=` | Fixtures with status, result, crowd forecast and your pick |
 | `POST /api/picks` | `{matchId, pick: {H, D, A}}` or two-tap `{matchId, outcome, confidence}`. Refused from kickoff on |
 | `GET /api/picks` | Your picks and points |
-| `GET /api/leaderboard?league=all&period=week\|season&date=&scope=global\|league:<id>` | Average points, minimum pick count applies, plus your own line. League scope is members only |
+| `GET /api/leaderboard?league=all&period=week\|season&date=&scope=global\|league:<id>` | Ranked by total points (ties to the higher average), plus your own line. League scope is members only |
 | `GET /api/leagues`, `POST /api/leagues/join`, `POST /api/leagues/leave` | Your leagues; join with a code (free); leave |
 | `GET /api/leagues/preview?code=` | A league's name and size, before joining |
 | `POST /api/leagues/order` | `{name}` → the order to pay for with `Pi.createPayment` |

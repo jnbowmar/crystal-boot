@@ -82,29 +82,31 @@ export function Table({
         <>
           {me && me.rank === null && (
             <p className="note">
-              You have {me.picks} scored {me.picks === 1 ? 'pick' : 'picks'}
-              {period === 'week' ? ' this week' : ''}. {board.minPicks} gets you on the table.
+              Your points show here once {period === 'week' ? "one of this week's picks" : 'one of your picks'} is
+              scored.
             </p>
           )}
           {board.standings.length === 0 ? (
-            <p className="empty">
-              Nobody has {board.minPicks} scored picks {period === 'week' ? 'this week' : 'this season'} yet.
-            </p>
+            <p className="empty">No scored picks {period === 'week' ? 'this week' : 'this season'} yet.</p>
           ) : (
             <ol className="table">
               {board.standings.map((s) => (
                 <li key={s.userId} className={s.userId === me?.userId ? 'me' : undefined}>
                   <span className="rank">{s.rank}</span>
-                  <span className="name">{s.username}</span>
-                  <span className="muted">{s.picks}</span>
-                  <b>{s.avgPoints?.toFixed(1)}</b>
+                  <span className="name">
+                    {s.username}
+                    <small className="muted" title="Average points per pick">
+                      {s.picks} {s.picks === 1 ? 'pick' : 'picks'} · avg {Math.round(s.avgPoints ?? 0)}
+                    </small>
+                  </span>
+                  <b>{s.totalPoints.toLocaleString('en-GB')}</b>
                 </li>
               ))}
             </ol>
           )}
           <p className="fine">
-            Ranked by average points per pick. You need at least {board.minPicks} scored picks to appear, so skipping
-            the hard matches doesn't help.
+            Ranked by total points. Every pick scores up to 100, so pick every match. On a tie, the higher average
+            goes first.
           </p>
         </>
       )}

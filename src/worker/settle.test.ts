@@ -6,7 +6,6 @@ import { matchId, type FeedMatch } from '../data/openfootball'
 import {
   BASE_RATES,
   CONFIDENCE,
-  MIN_PICKS,
   OUTCOMES,
   crowd,
   leaderboard,
@@ -200,14 +199,12 @@ describe('M2 proof: the 9/20 matches settle and score correctly', async () => {
     const { status, body } = await call(tuesday, 'GET', '/api/leaderboard?period=week&date=2026-09-20')
     expect(status).toBe(200)
     expect(body.from).toBe('2026-09-15T00:00:00.000Z')
-    expect(body.minPicks).toBe(MIN_PICKS.week)
     const actual = new Map(truth.map((t) => [t.id, t.actual]))
     const expected = leaderboard(
       [...made].map(([key, pick]) => {
         const [user, id] = key.split(/\|(.*)/s)
         return { userId: `fake:${user}`, matchId: id, points: points(pick, actual.get(id)!) }
       }),
-      MIN_PICKS.week,
     )
     expect(body.standings.map(({ username: _, ...s }: { username: string }) => s)).toEqual(expected)
     expect(body.standings).toHaveLength(12)
@@ -217,10 +214,10 @@ describe('M2 proof: the 9/20 matches settle and score correctly', async () => {
     const ranked = await call(tuesday, 'GET', '/api/leaderboard?period=week&date=2026-09-20', { user: 'fan_1' })
     expect(ranked.body.me).toEqual(ranked.body.standings.find((s: { userId: string }) => s.userId === 'fake:fan_1'))
     const season = await call(tuesday, 'GET', '/api/leaderboard?period=season', { user: 'fan_1' })
-    expect(season.body.me).toMatchObject({ rank: null, userId: 'fake:fan_1', picks: 20 })
-    expect(season.body.standings).toEqual([]) // nobody has 50 yet
+    expect(season.body.me).toEqual(season.body.standings.find((s: { userId: string }) => s.userId === 'fake:fan_1'))
+    expect(season.body.me).toMatchObject({ userId: 'fake:fan_1', picks: 20 })
     const newcomer = await call(tuesday, 'GET', '/api/leaderboard?period=week&date=2026-09-20', { user: 'newbie' })
-    expect(newcomer.body.me).toEqual({ rank: null, userId: 'fake:newbie', picks: 0, avgPoints: null })
+    expect(newcomer.body.me).toEqual({ rank: null, userId: 'fake:newbie', picks: 0, totalPoints: 0, avgPoints: null })
     expect((await call(tuesday, 'GET', '/api/leaderboard')).body.me).toBeNull()
   })
 

@@ -20,10 +20,6 @@ export const BASE_RATES: Record<League, Probs> = {
 export const CONFIDENCE = { lean: 50, likely: 65, confident: 80, lock: 95 } as const
 export type Confidence = keyof typeof CONFIDENCE
 
-// Leaderboards rank by average points, but only once you've made enough picks,
-// so skipping the hard matches can't win.
-export const MIN_PICKS = { week: 10, season: 50 } as const
-
 /** Throws unless p is three whole percentages in 0..100 summing to 100. */
 export function validatePick(p: Probs): void {
   for (const o of OUTCOMES) {
@@ -117,15 +113,17 @@ export interface Standing {
   rank: number
   userId: string
   picks: number
+  totalPoints: number
   avgPoints: number
 }
 
 /**
- * Rank players by average points, dropping anyone under minPicks.
- * Ties share a rank (1, 2, 2, 4). Tie order within a rank: more picks first,
- * then userId, so the list is stable between refreshes.
+ * Rank players by total points: most points wins, so picking every match pays.
+ * Equal totals go to the player who needed fewer picks (the higher average),
+ * and share a rank (1, 2, 2, 4) only when picks are equal too. Within a
+ * shared rank the order is by userId, so the list is stable between refreshes.
  */
-export function leaderboard(scored: readonly ScoredPick[], minPicks: number): Standing[] {
+export function leaderboard(scored: readonly ScoredPick[]): Standing[] {
   const byUser = new Map<string, { total: number; n: number }>()
   for (const s of scored) {
     const u = byUser.get(s.userId) ?? { total: 0, n: 0 }
@@ -133,23 +131,17 @@ export function leaderboard(scored: readonly ScoredPick[], minPicks: number): St
     u.n += 1
     byUser.set(s.userId, u)
   }
-  const rows = [...byUser]
-    .filter(([, u]) => u.n >= minPicks)
-    .map(([userId, u]) => ({ userId, picks: u.n, total: u.total }))
-  // Compare averages by cross-multiplying so equal averages tie exactly
-  // (70/3 vs 140/6) instead of by floating-point accident.
-  rows.sort(
-    (a, b) =>
-      b.total * a.picks - a.total * b.picks || b.picks - a.picks || (a.userId < b.userId ? -1 : 1),
-  )
+  const rows = [...byUser].map(([userId, u]) => ({ userId, picks: u.n, total: u.total }))
+  rows.sort((a, b) => b.total - a.total || a.picks - b.picks || (a.userId < b.userId ? -1 : 1))
   const out: Standing[] = []
   rows.forEach((r, i) => {
     const prev = rows[i - 1]
-    const tied = prev !== undefined && r.total * prev.picks === prev.total * r.picks
+    const tied = prev !== undefined && r.total === prev.total && r.picks === prev.picks
     out.push({
       rank: tied ? out[i - 1].rank : i + 1,
       userId: r.userId,
       picks: r.picks,
+      totalPoints: r.total,
       avgPoints: r.total / r.picks,
     })
   })
