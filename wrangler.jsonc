@@ -28,7 +28,7 @@
     "FAKE_USERS": "0",
     "PI_SANDBOX": "1",
     "PI_NETWORK": "Pi Testnet",
-    "LEAGUE_PRICE_PI": "0.5"
+    "LEAGUE_PRICE_PI": "1"
   },
   "observability": { "enabled": true }
 }

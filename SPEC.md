@@ -173,7 +173,7 @@ Private leagues are in `src/worker/leagues.ts`, payments in `src/worker/payments
 - **Not checked:** real Pi. The SDK host is blocked from the build environment, so the proof ("full approve→sign→complete loop, cancel handled") still needs one run in the Pi sandbox with testnet Pi.
 
 **Decisions made in M4:**
-- **Price: 0.5 Pi** (the low end of the 2026-09-23 re-price), set by `LEAGUE_PRICE_PI`. I couldn't check current mining rates from here, so **re-check them before mainnet**. The price shows in Pi only, never in dollars.
+- **Price: 1 Pi** since 2026-09-27 (was 0.5), set by `LEAGUE_PRICE_PI`. James's call: one person pays and the whole group plays free, most active Pioneers hold far more than 1 Pi, and 1 Pi is still earnable by mining in 2 to 3 weeks, so nobody needs to buy Pi to afford it. Re-check at Mainnet with real players. The price shows in Pi only, never in dollars.
 - **Deliver only on Pi's word.** A league is created only when Pi's own record of the payment is developer-completed with a verified transaction and the matching txid. Delivery is keyed on the order (`leagues.order_id` is UNIQUE), so SDK retries and resumed payments can't create a second league.
 - **Every payment check reads Pi's record, not the client's:** the user, the order (`metadata.orderId`), the exact amount, the direction and the network (`PI_NETWORK`, "Pi Testnet" now). One order takes one payment.
 - **A cancel only counts while there's no transaction.** If Pi shows a signed transaction, the order is completed and delivered even if the app had reported a cancel, because we were paid.

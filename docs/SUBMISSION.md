@@ -16,7 +16,7 @@ What a #PiHackathon entry needs, from Pi's hackathon pages (checked 26 September
 | ☑ | M3 proof: sign in and make real picks in the Pi sandbox | done 27 Sept: Pi sign-in, 5 picks (EPL + La Liga, two-tap and sliders) saved on the live database |
 | ☑ | M4 proof: start a league with testnet Pi, and cancel one partway through | done 27 Sept: one order cancelled at the wallet (no league), one paid 0.5 test-Pi and completed, league created with invite code; tx c9d99442… confirmed on Pi Testnet |
 | ☑ | Set `FAKE_USERS` to `"0"` in `wrangler.jsonc` for the demo deploy, so judges only see Pi sign-in | done (local dev turns it on in `.dev.vars`) |
-| ☐ | Re-check the league price against current mining rates (`LEAGUE_PRICE_PI`, 0.5 now) | not done |
+| ☑ | Re-check the league price against current mining rates (`LEAGUE_PRICE_PI`) | done 27 Sept: raised to 1 Pi (one payer, whole group plays free; still earnable by mining in 2 to 3 weeks). Revisit at Mainnet |
 | ☑ | Review the privacy page (`web/public/privacy.html`), especially the deletion promise | done 27 Sept: names Adjusted Close LLC, contact crystalboot@adjustedclose.com, Cloudflare logs, public txids, retention; in-app Delete account |
 | ☐ | Record the real sandbox video (shot list below), upload it, and link it here and in the README | local demo recorded |
 | ☑ | Public repo, MIT licence | done (public since 24 Sept) |
