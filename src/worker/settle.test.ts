@@ -353,6 +353,53 @@ describe('feed changes after picks', () => {
     })
   })
 
+  it('lists results still owed and takes several at once, all or nothing', async () => {
+    const { db, call } = setup()
+    const two = {
+      matches: [
+        { round: 'Matchday 5', date: '2026-09-20', time: '14:00', team1: 'AFC Bournemouth', team2: 'Liverpool FC' },
+        { round: 'Matchday 6', date: '2026-10-10', time: '15:00', team1: 'Liverpool FC', team2: 'AFC Bournemouth' },
+        { round: 'Matchday 7', date: '2026-10-17', time: '15:00', team1: 'Arsenal FC', team2: 'Liverpool FC' },
+      ],
+    }
+    const t0 = at('2026-09-18T09:00:00Z')
+    await sync(db, t0, fetcherFor({ 'en.1': two }), ['en.1'])
+    await call(t0, 'POST', '/api/picks', { user: 'fan', body: { matchId: id, pick: { H: 10, D: 20, A: 70 } } })
+    const back = matchId('en.1', '2026-27', 'Liverpool FC', 'AFC Bournemouth')
+    const later = matchId('en.1', '2026-27', 'Arsenal FC', 'Liverpool FC')
+
+    // 11 Oct: the first match was voided for want of a score, the second is waiting.
+    const t1 = at('2026-10-11T00:00:00Z')
+    await settle(db, t1)
+    expect((await call(t1, 'GET', '/api/admin/pending')).status).toBe(401)
+    const pending = await call(t1, 'GET', '/api/admin/pending', { admin: true })
+    expect(pending.body.matches.map((m: any) => [m.id, m.status, m.picks])).toEqual([
+      [id, 'void', 1],
+      [back, 'scheduled', 0],
+    ])
+
+    // One bad entry (not kicked off yet) stores nothing.
+    const bad = await call(t1, 'POST', '/api/admin/scores', {
+      admin: true,
+      body: { scores: [{ matchId: id, home: 0, away: 2 }, { matchId: later, home: 1, away: 1 }] },
+    })
+    expect(bad.status).toBe(409)
+    expect(db.sqlite.prepare("SELECT count(*) AS n FROM matches WHERE score_source = 'admin'").get()).toEqual({ n: 0 })
+    const dup = await call(t1, 'POST', '/api/admin/scores', {
+      admin: true,
+      body: { scores: [{ matchId: id, home: 0, away: 2 }, { matchId: id, home: 0, away: 2 }] },
+    })
+    expect(dup.status).toBe(400)
+
+    const ok = await call(t1, 'POST', '/api/admin/scores', {
+      admin: true,
+      body: { scores: [{ matchId: id, home: 0, away: 2 }, { matchId: back, home: 1, away: 1 }] },
+    })
+    expect(ok.body).toEqual({ stored: 2, settled: 2, voided: 0 })
+    expect(db.sqlite.prepare('SELECT points FROM picks').get()).toEqual({ points: points({ H: 10, D: 20, A: 70 }, 'A') })
+    expect((await call(t1, 'GET', '/api/admin/pending', { admin: true })).body.matches).toEqual([])
+  })
+
   it('keeps settling when one league feed is down', async () => {
     const { db } = setup()
     const report = await sync(db, at('2026-09-22T18:00:00Z'), fetcherFor({ 'es.1': feed('es.1') }), LEAGUE_IDS)

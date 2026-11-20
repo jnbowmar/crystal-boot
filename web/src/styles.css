@@ -822,3 +822,29 @@ button.card:active {
   color: var(--warn);
   font-weight: 700;
 }
+
+/* /admin results page */
+.admin h1 { font-size: 1.3rem; margin: 16px 0 8px; }
+.admin-head { display: flex; align-items: center; justify-content: space-between; }
+.admin-row {
+  display: grid;
+  grid-template-columns: 1fr 3rem auto 3rem 1fr;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+.admin-row .admin-team:last-of-type { text-align: left; }
+.admin-row .admin-team:first-child { text-align: right; }
+.admin-row input {
+  width: 100%;
+  text-align: center;
+  font: inherit;
+  padding: 6px 0;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink);
+}
+.admin-row .small { grid-column: 1 / -1; text-align: center; }
+.admin-save { position: sticky; bottom: 0; padding: 12px 0; background: var(--bg); display: flex; gap: 12px; align-items: center; }

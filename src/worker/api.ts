@@ -271,26 +271,90 @@ async function getLeaderboard(req: Request, env: Env, url: URL, now: number): Pr
   })
 }
 
-/** POST /api/admin/score {matchId, home, away}: enter a result by hand, then settle. */
-async function adminScore(req: Request, env: Env, now: number): Promise<Response> {
-  const { matchId, home, away } = await readJson(req)
+interface ScoreEntry {
+  matchId: string
+  home: number
+  away: number
+}
+
+function scoreEntry(v: unknown): ScoreEntry {
+  const { matchId, home, away } = (v ?? {}) as Record<string, unknown>
   if (typeof matchId !== 'string') throw new HttpError(400, 'matchId is required')
   for (const g of [home, away]) {
     if (!Number.isInteger(g) || (g as number) < 0) throw new HttpError(400, 'home and away must be goals (0+)')
   }
-  const match = await env.DB.prepare('SELECT kickoff_at FROM matches WHERE id = ?1')
-    .bind(matchId)
-    .first<{ kickoff_at: number }>()
-  if (!match) throw new HttpError(404, 'no such match')
-  // An admin score outranks the feed for good, so don't allow one before kickoff.
-  if (now < match.kickoff_at) throw new HttpError(409, 'match has not kicked off')
-  await env.DB.prepare(
-    `UPDATE matches SET home_goals = ?2, away_goals = ?3, score_source = 'admin', updated_at = ?4
-     WHERE id = ?1`,
+  return { matchId, home: home as number, away: away as number }
+}
+
+/**
+ * Store hand-entered results, all or nothing, then settle once. An admin
+ * score outranks the feed for good, so none is allowed before kickoff.
+ */
+async function storeScores(env: Env, entries: readonly ScoreEntry[], now: number) {
+  const ids = entries.map((e) => e.matchId)
+  if (new Set(ids).size !== ids.length) throw new HttpError(400, 'a match appears twice')
+  const { results } = await env.DB.prepare(
+    'SELECT id, kickoff_at FROM matches WHERE id IN (SELECT value FROM json_each(?1))',
   )
-    .bind(matchId, home, away, now)
-    .run()
-  return json(await settle(env.DB, now))
+    .bind(JSON.stringify(ids))
+    .all<{ id: string; kickoff_at: number }>()
+  const kickoff = new Map(results.map((r) => [r.id, r.kickoff_at]))
+  for (const e of entries) {
+    const k = kickoff.get(e.matchId)
+    if (k === undefined) throw new HttpError(404, `no such match ${e.matchId}`)
+    if (now < k) throw new HttpError(409, entries.length === 1 ? 'match has not kicked off' : `${e.matchId} has not kicked off`)
+  }
+  if (entries.length > 0) {
+    await env.DB.batch(
+      entries.map((e) =>
+        env.DB.prepare(
+          `UPDATE matches SET home_goals = ?2, away_goals = ?3, score_source = 'admin', updated_at = ?4
+           WHERE id = ?1`,
+        ).bind(e.matchId, e.home, e.away, now),
+      ),
+    )
+  }
+  return settle(env.DB, now)
+}
+
+/** POST /api/admin/score {matchId, home, away}: enter one result by hand, then settle. */
+async function adminScore(req: Request, env: Env, now: number): Promise<Response> {
+  return json(await storeScores(env, [scoreEntry(await readJson(req))], now))
+}
+
+/** Most results one POST /api/admin/scores takes (D1 batch size stays small). */
+export const MAX_SCORES = 100
+
+/** POST /api/admin/scores {scores: [{matchId, home, away}]}: several results, one settle. */
+async function adminScores(req: Request, env: Env, now: number): Promise<Response> {
+  const { scores } = await readJson(req)
+  if (!Array.isArray(scores) || scores.length === 0) throw new HttpError(400, 'scores must be a non-empty list')
+  if (scores.length > MAX_SCORES) throw new HttpError(400, `at most ${MAX_SCORES} scores at a time`)
+  const entries = scores.map(scoreEntry)
+  return json({ stored: entries.length, ...(await storeScores(env, entries, now)) })
+}
+
+/**
+ * GET /api/admin/pending: matches that have kicked off but have no settled
+ * result (waiting, or voided for want of one), oldest first, with how many
+ * picks each holds.
+ */
+async function adminPending(env: Env, now: number): Promise<Response> {
+  const { results } = await env.DB.prepare(
+    `SELECT m.id, m.league, m.round, m.home, m.away, m.date, m.time, m.kickoff_at, m.status,
+       (SELECT count(*) FROM picks WHERE match_id = m.id) AS picks
+     FROM matches AS m
+     WHERE m.kickoff_at <= ?1 AND m.status != 'settled'
+     ORDER BY m.kickoff_at, m.league, m.home`,
+  )
+    .bind(now)
+    .all<{ id: string; league: League; round: string | null; home: string; away: string; date: string; time: string | null; kickoff_at: number; status: string; picks: number }>()
+  return json({
+    matches: results.map((m) => ({
+      id: m.id, league: m.league, round: m.round, home: m.home, away: m.away, date: m.date, time: m.time,
+      kickoffAt: new Date(m.kickoff_at).toISOString(), status: m.status, picks: m.picks,
+    })),
+  })
 }
 
 export function leaguePrice(env: Env): number {
@@ -401,6 +465,12 @@ export async function handle(req: Request, env: Env, now: number, fetcher: Fetch
       case 'POST /api/admin/score':
         requireAdmin(req, env)
         return await adminScore(req, env, now)
+      case 'POST /api/admin/scores':
+        requireAdmin(req, env)
+        return await adminScores(req, env, now)
+      case 'GET /api/admin/pending':
+        requireAdmin(req, env)
+        return await adminPending(env, now)
     }
     return json({ error: 'not found' }, 404)
   } catch (e) {
